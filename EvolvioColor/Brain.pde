@@ -1,15 +1,16 @@
 class Brain {
   // Brain
+  final int MEMORY_COUNT = 1;
   final int BRAIN_WIDTH = 3;
-  final int BRAIN_HEIGHT = 13;
+  final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
   final double AXON_START_MUTABILITY = 0.0005;
   final double STARTING_AXON_VARIABILITY = 1.0;
   Axon[][][] axons;
   double[][] neurons;
 
-  //Memory
-  int MEMORY_COUNT = 1;
-  double[] memories;
+  //labels
+  String[] inputLabels = new String[BRAIN_HEIGHT];
+  String[] outputLabels = new String[BRAIN_HEIGHT];
 
   public Brain(Axon[][][] tbrain, double[][] tneurons) {
     //initialize brain
@@ -38,15 +39,25 @@ class Brain {
       axons = tbrain;
       neurons = tneurons;
     }
-
-    //initialize memories
-    memories = new double[MEMORY_COUNT];
-    for (int i = 0; i < MEMORY_COUNT; i++) {
-      memories[i] = 0;
+    
+    //initialize labels
+    String[] baseInput = {"0Hue", "0Sat", "0Bri", "1Hue", 
+      "1Sat", "1Bri", "2Hue", "2Sat", "2Bri", "Size", "MHue"};
+    String[] baseOutput = {"BHue", "Accel.", "Turn", "Eat", "Fight", "Birth", "How funny?", 
+      "How popular?", "How generous?", "How smart?", "MHue"};
+    for (int i = 0; i<11; i++) {
+      inputLabels[i]=baseInput[i];
+      outputLabels[i] = baseOutput[i];
     }
+    for (int i = 0; i<MEMORY_COUNT; i++) {
+      inputLabels[i+11]="memory";
+      outputLabels[i+11] = "memory";
+    }
+    inputLabels[BRAIN_HEIGHT-1] = "const.";
+    outputLabels[BRAIN_HEIGHT-1] = "const.";
   }
 
-  //this would be a 
+  //this would be a static method, but processing doesn't like mixing types
   public Brain evolve(ArrayList<Creature> parents) {
     int parentsTotal = parents.size();
     Axon[][][] newBrain = new Axon[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT - 1];
@@ -68,7 +79,7 @@ class Brain {
         newNeurons[x][y] = parentForAxon.neurons[x][y];
       }
     }
-    return new Brain(newBrain,newNeurons);
+    return new Brain(newBrain, newNeurons);
   }
 
   public void draw(PFont font, float scaleUp, int mX, int mY) {
@@ -81,10 +92,6 @@ class Brain {
     strokeWeight(2);
     textFont(font, 0.58 * scaleUp);
     fill(0, 0, 1);
-    String[] inputLabels = {"0Hue", "0Sat", "0Bri", "1Hue", 
-      "1Sat", "1Bri", "2Hue", "2Sat", "2Bri", "Size", "MHue", "Mem", "Const."};
-    String[] outputLabels = {"BHue", "Accel.", "Turn", "Eat", "Fight", "Birth", "How funny?", 
-      "How popular?", "How generous?", "How smart?", "MHue", "Mem", "Const."};
     for (int y = 0; y < BRAIN_HEIGHT; y++) {
       textAlign(RIGHT);
       text(inputLabels[y], (-neuronSize - 0.1) * scaleUp, (y + (neuronSize * 0.6)) * scaleUp);
@@ -116,10 +123,10 @@ class Brain {
 
   public void input(double[] inputs) {
     int end = BRAIN_WIDTH - 1;
-    for(int i = 0;i<11;i++){
+    for (int i = 0; i<11; i++) {
       neurons[0][i] = inputs[i];
     }
-    for(int i = 0;i<MEMORY_COUNT;i++){
+    for (int i = 0; i<MEMORY_COUNT; i++) {
       neurons[0][11+i] = neurons[end][11+i];
     }
     neurons[0][BRAIN_HEIGHT-1] = 1;

@@ -116,7 +116,7 @@ class Board {
     }
   }
 
-  public void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
+  public synchronized void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
     for (int x = 0; x < boardWidth; x++) {
       for (int y = 0; y < boardHeight; y++) {
         tiles[x][y].drawTile(scaleUp, (mX == x && mY == y));
@@ -130,12 +130,12 @@ class Board {
     }
   }
 
-  public void drawBlankBoard(float scaleUp) {
+  public synchronized void drawBlankBoard(float scaleUp) {
     fill(BACKGROUND_COLOR);
     rect(0, 0, scaleUp * boardWidth, scaleUp * boardHeight);
   }
 
-  public void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
+  public synchronized void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
     fill(0, 0, 0);
     noStroke();
     rect(x1, y1, x2 - x1, y2 - y1);
@@ -309,7 +309,7 @@ class Board {
     }
   }
 
-  void drawPopulationGraph(float x1, float x2, float y1, float y2) {
+  private synchronized void drawPopulationGraph(float x1, float x2, float y1, float y2) {
     float barWidth = (x2 - x1) / ((float)(POPULATION_HISTORY_LENGTH));
     noStroke();
     fill(0.33333, 1, 0.6);
@@ -325,7 +325,7 @@ class Board {
     }
   }
 
-  String getNextFileName(int type) {
+  public synchronized String getNextFileName(int type) {
     String[] modes = {"manualImgs", "autoImgs", "manualTexts", "autoTexts"};
     String ending = ".png";
     if (type >= 2) {
@@ -334,7 +334,7 @@ class Board {
     return folder + "/" + modes[type] + "/" + nf(fileSaveCounts[type], 5) + ending;
   }
 
-  public void iterate(double timeStep) {
+  public synchronized void iterate(double timeStep) {
     double prevYear = year;
     year += timeStep;
     if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
@@ -408,7 +408,7 @@ class Board {
     finishIterate(timeStep);
   }
 
-  public void finishIterate(double timeStep) {
+  public synchronized void finishIterate(double timeStep) {
     for (int i = 0; i < rocks.size(); i++) {
       rocks.get(i).applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
@@ -439,7 +439,7 @@ class Board {
     return (year % 1.0);
   }
 
-  private void drawThermometer(float x1, float y1, float w, float h, double prog, double min, double max, 
+  private synchronized void drawThermometer(float x1, float y1, float w, float h, double prog, double min, double max, 
     color fillColor) {
     noStroke();
     fill(0, 0, 0.2);
@@ -573,11 +573,11 @@ class Board {
     }
   }
   
-  public void incrementSort() {
+  public synchronized void incrementSort() {
     evoBoard.creatureRankMetric = (evoBoard.creatureRankMetric + 1) % sorts.length;
   }
   
-  public void decrementSort() {
+  public synchronized void decrementSort() {
     evoBoard.creatureRankMetric = (evoBoard.creatureRankMetric + sorts.length - 1) % sorts.length;
   }
 

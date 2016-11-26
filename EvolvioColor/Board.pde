@@ -410,7 +410,7 @@ class Board implements AbstractBoardInterface {
     while (creatureIterator.hasNext()) {
       final Creature me = creatureIterator.next();
       me.collide(timeStep);
-      me.metabolize(timeStep);
+      me.metabolize(timeStep, year);
       me.useBrain(timeStep, !userControl, this.year);
       if (userControl) {
         if (me == selectedCreature) {
@@ -423,7 +423,7 @@ class Board implements AbstractBoardInterface {
             } else {
               if (key == ' ') me.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
               if (key == 'v' || key == 'V') me.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'f' || key == 'F')  me.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+              if (key == 'f' || key == 'F')  me.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR, year);
               if (key == 'u' || key == 'U') me.setHue(me.hue + 0.02);
               if (key == 'j' || key == 'J') me.setHue(me.hue - 0.02);
 
@@ -431,7 +431,7 @@ class Board implements AbstractBoardInterface {
               if (key == 'k' || key == 'K') me.setMouthHue(me.mouthHue - 0.02);
               if (key == 'b' || key == 'B') {
                 if (!wasPressingB) {
-                  me.reproduce(MANUAL_BIRTH_SIZE, timeStep);
+                  me.reproduce(MANUAL_BIRTH_SIZE, timeStep, year);
                 }
                 wasPressingB = true;
               } else {

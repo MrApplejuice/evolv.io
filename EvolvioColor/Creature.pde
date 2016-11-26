@@ -62,7 +62,9 @@ class Creature extends SoftBody {
 
     super(tpx, tpy, tvx, tvy, tenergy, tdensity, thue, tsaturation, tbrightness, tb, bt);
 
-    if(brain ==null)brain = new Brain(null,null);
+    if (brain == null) {
+      brain = new Brain(null, null);
+    }
     this.brain = brain;
 
     rotation = rot;
@@ -96,33 +98,11 @@ class Creature extends SoftBody {
     return id;
   }
 
+  /////////////////// DRAW FUNCTIONS /////////////////
+ 
   public void drawBrain(PFont font, float scaleUp, int mX, int mY) {
     brain.draw(font, scaleUp, mX, mY);
   }
-
-  public void useBrain(double timeStep, boolean useOutput, double currentYear) {
-    double inputs[]= new double[11];
-    for (int i = 0; i < 9; i++) {
-      inputs[i] = visionResults[i];
-    }
-    inputs[9]= energy;
-    inputs[10] = mouthHue;
-    brain.input(inputs);
-
-    if (useOutput) {
-      double[] output = brain.outputs();
-      hue = Math.abs(output[0]) % 1.0;
-      accelerate(output[1], timeStep);
-      turn(output[2], timeStep);
-      eat(output[3], timeStep);
-      fight(output[4], timeStep * 100);
-      if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
-        reproduce(SAFE_SIZE, timeStep);
-      }
-      mouthHue = Math.abs(output[10]) % 1.0;
-    }
-  }
-
 
   public void drawSoftBody(float scaleUp, float camZoom, boolean showVision) {
     ellipseMode(RADIUS);
@@ -196,8 +176,33 @@ class Creature extends SoftBody {
     popMatrix();
   }
 
-  public void metabolize(double timeStep) {
-    double age = AGE_FACTOR * (board.year - birthTime); // the older the more work necessary
+  //////////////////// SIMULATION FUNCTIONS ////////////////////
+
+  public void useBrain(double timeStep, boolean useOutput, double currentYear) {
+    double inputs[]= new double[11];
+    for (int i = 0; i < 9; i++) {
+      inputs[i] = visionResults[i];
+    }
+    inputs[9]= energy;
+    inputs[10] = mouthHue;
+    brain.input(inputs);
+
+    if (useOutput) {
+      double[] output = brain.outputs();
+      hue = Math.abs(output[0]) % 1.0;
+      accelerate(output[1], timeStep);
+      turn(output[2], timeStep);
+      eat(output[3], timeStep);
+      fight(output[4], timeStep * 100);
+      if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
+        reproduce(SAFE_SIZE, timeStep);
+      }
+      mouthHue = Math.abs(output[10]) % 1.0;
+    }
+  }
+
+  public void metabolize(double timeStep, double currentYear) {
+    double age = AGE_FACTOR * (currentYear - birthTime); // the older the more work necessary
     loseEnergy(energy * METABOLISM_ENERGY * age * timeStep);
   }
 
@@ -215,19 +220,6 @@ class Creature extends SoftBody {
   public void turn(double amount, double timeStep) {
     vr += 0.04 * amount * timeStep / getMass();
     loseEnergy(Math.abs(amount * TURN_ENERGY * energy * timeStep));
-  }
-
-  public Tile getRandomCoveredTile() {
-    double radius = (float)getRadius();
-    double choiceX = 0;
-    double choiceY = 0;
-    while (dist((float)px, (float)py, (float)choiceX, (float)choiceY) > radius) {
-      choiceX = (Math.random() * 2 * radius - radius) + px;
-      choiceY = (Math.random() * 2 * radius - radius) + py;
-    }
-    int x = xBound((int)choiceX);
-    int y = yBound((int)choiceY);
-    return board.tiles[x][y];
   }
 
   public void eat(double attemptedAmount, double timeStep) {
@@ -253,8 +245,8 @@ class Creature extends SoftBody {
     }
   }
 
-  public void fight(double amount, double timeStep) {
-    if (amount > 0 && board.year-birthTime >= MATURE_AGE) {
+  public void fight(double amount, double timeStep, double currentYear) {
+    if (amount > 0 && currentYear - birthTime >= MATURE_AGE) {
       fightLevel = amount;
       loseEnergy(fightLevel * FIGHT_ENERGY * energy * timeStep);
       for (int i = 0; i < colliders.size(); i++) {
@@ -348,6 +340,19 @@ class Creature extends SoftBody {
     }
   }
 
+  private Tile getRandomCoveredTile() {
+    double radius = (float) getRadius();
+    double choiceX = 0;
+    double choiceY = 0;
+    while (dist((float)px, (float)py, (float)choiceX, (float)choiceY) > radius) {
+      choiceX = (Math.random() * 2 * radius - radius) + px;
+      choiceY = (Math.random() * 2 * radius - radius) + py;
+    }
+    int x = xBound((int)choiceX);
+    int y = yBound((int)choiceY);
+    return board.tiles[x][y];
+  }
+
   public color getColorAt(double x, double y) {
     if (x >= 0 && x < board.boardWidth && y >= 0 && y < board.boardHeight) {
       return board.tiles[(int)(x)][(int)(y)].getColor();
@@ -373,7 +378,6 @@ class Creature extends SoftBody {
 
   public void returnToEarth() {
     int pieces = 20;
-    double radius = (float)getRadius();
     for (int i = 0; i < pieces; i++) {
       getRandomCoveredTile().addFood(energy / pieces, hue, true);
     }
@@ -387,7 +391,7 @@ class Creature extends SoftBody {
     }
   }
 
-  public void reproduce(double babySize, double timeStep) {
+  public void reproduce(double babySize, double timeStep, double currentYear) {
     if (colliders == null) {
       collide(timeStep);
     }
@@ -436,7 +440,7 @@ class Creature extends SoftBody {
         newSaturation = 1;
         newBrightness = 1;
         board.addCreature(new Creature(newPX, newPY, 0, 0, 
-          babySize, density, newHue, newSaturation, newBrightness, board, board.year, random(0, 2 * PI), 0, 
+          babySize, density, newHue, newSaturation, newBrightness, board, currentYear, random(0, 2 * PI), 0, 
           stitchName(parentNames), andifyParents(parentNames), true, 
           newBrain, highestGen + 1, newMouthHue));
       }

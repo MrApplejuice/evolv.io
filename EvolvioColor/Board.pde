@@ -411,7 +411,7 @@ class Board implements AbstractBoardInterface {
       final Creature me = creatureIterator.next();
       me.collide(timeStep);
       me.metabolize(timeStep);
-      me.useBrain(timeStep, !userControl);
+      me.useBrain(timeStep, !userControl, this.year);
       if (userControl) {
         if (me == selectedCreature) {
           if (keyPressed) {

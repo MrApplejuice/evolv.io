@@ -93,7 +93,7 @@ class Creature extends SoftBody {
     brain.draw(font, scaleUp, mX, mY);
   }
 
-  public void useBrain(double timeStep, boolean useOutput) {
+  public void useBrain(double timeStep, boolean useOutput, double currentYear) {
     double inputs[]= new double[11];
     for (int i = 0; i < 9; i++) {
       inputs[i] = visionResults[i];
@@ -109,7 +109,7 @@ class Creature extends SoftBody {
       turn(output[2], timeStep);
       eat(output[3], timeStep);
       fight(output[4], timeStep * 100);
-      if (output[5] > 0 && board.year-birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
+      if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
         reproduce(SAFE_SIZE, timeStep);
       }
       mouthHue = Math.abs(output[10]) % 1.0;

@@ -1,6 +1,27 @@
 import java.io.*;
+import java.util.Iterator;
 
-class Board {
+/**
+  More abstraction layers to /some/ interaction between Creatues and the board.
+  
+  This must be in a super-controlled manner however to make multithreading efficient 
+  and also prevent deadlocks.
+ */
+public interface AbstractBoardInterface {
+  // Adds a new creature to the Board (reproduction)
+  public void addCreature(Creature creature);
+};
+
+/**
+  This class exposes variables to EVERYTHING. Efficient parallelization
+  of execution is not possible while other classes are so tightly coupled 
+  with this class. I will spend some work on making more of this class private
+  so that especially Creatures can be somewhat more decoupled from the board
+  they live on.
+  
+  In the future the UI elements should als obe stripped from this class...
+ */
+class Board implements AbstractBoardInterface {
   // Board
   int boardWidth;
   int boardHeight;
@@ -13,7 +34,10 @@ class Board {
   final float MINIMUM_SURVIVABLE_SIZE = 0.06;
   final float CREATURE_STROKE_WEIGHT = 0.6;
   ArrayList[][] softBodiesInPositions;
-  ArrayList<Creature> creatures;
+  
+  private ArrayList<Creature> newCreatures = new ArrayList<Creature>();
+  private ArrayList<Creature> creatures = new ArrayList<Creature>(0);
+
   Creature selectedCreature = null;
   int creatureIDUpTo = 0;
   private int creatureRankMetric = 0;
@@ -96,7 +120,6 @@ class Board {
     }
 
     creatureMinimum = cm;
-    creatures = new ArrayList<Creature>(0);
     maintainCreatureMinimum(false);
     for (int i = 0; i < LIST_SLOTS; i++) {
       list[i] = null;
@@ -334,6 +357,10 @@ class Board {
     return folder + "/" + modes[type] + "/" + nf(fileSaveCounts[type], 5) + ending;
   }
 
+  public synchronized void addCreature(Creature newCreature) {
+    newCreatures.add(newCreature);
+  }
+
   public synchronized void iterate(double timeStep) {
     double prevYear = year;
     year += timeStep;
@@ -358,15 +385,20 @@ class Board {
      tiles[x][y].iterate(this, year);
      }
      }*/
-    for (int i = 0; i < creatures.size(); i++) {
-      creatures.get(i).setPreviousEnergy();
+    for (final Creature creature : creatures) {
+      creature.setPreviousEnergy();
     }
     /*for(int i = 0; i < rocks.size(); i++) {
      rocks.get(i).collide(timeStep*OBJECT_TIMESTEPS_PER_YEAR);
      }*/
+     
+    // Fillup creature pool (first with children, then with new creatures)
+    mergeNewCreaturePool();
     maintainCreatureMinimum(false);
-    for (int i = 0; i < creatures.size(); i++) {
-      Creature me = creatures.get(i);
+    
+    final Iterator<Creature> creatureIterator = creatures.iterator(); 
+    while (creatureIterator.hasNext()) {
+      final Creature me = creatureIterator.next();
       me.collide(timeStep);
       me.metabolize(timeStep);
       me.useBrain(timeStep, !userControl);
@@ -401,20 +433,19 @@ class Board {
       }
       if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
         me.returnToEarth();
-        creatures.remove(me);
-        i--;
+        creatureIterator.remove();
       }
     }
     finishIterate(timeStep);
   }
 
   public synchronized void finishIterate(double timeStep) {
-    for (int i = 0; i < rocks.size(); i++) {
-      rocks.get(i).applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+    for (final SoftBody rock : rocks) {
+      rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
-    for (int i = 0; i < creatures.size(); i++) {
-      creatures.get(i).applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-      creatures.get(i).see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+    for (final Creature creature : creatures) {
+      creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+      creature.see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
     if (Math.floor(fileSaveTimes[1] / imageSaveInterval) != Math.floor(year / imageSaveInterval)) {
       prepareForFileSave(1);
@@ -522,8 +553,13 @@ class Board {
     return nf((float)(year - d), 0, 2) + " yrs old";
   }
 
+  private synchronized void mergeNewCreaturePool() {
+    this.creatures.addAll(this.newCreatures);
+    this.newCreatures.clear();
+  }
+
   private void maintainCreatureMinimum(boolean choosePreexisting) {
-    while (creatures.size() < creatureMinimum) {
+    while ((newCreatures.size() + creatures.size()) < creatureMinimum) {
       if (choosePreexisting) {
         Creature c = getRandomCreature();
         c.addEnergy(c.SAFE_SIZE);
@@ -534,6 +570,7 @@ class Board {
           this, year, random(0, 2 * PI), 0, "", "[PRIMORDIAL]", true, null, 1, random(0, 1)));
       }
     }
+    mergeNewCreaturePool();
   }
 
   private Creature getRandomCreature() {

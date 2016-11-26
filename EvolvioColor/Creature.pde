@@ -423,7 +423,7 @@ class Creature extends SoftBody {
         }
         newSaturation = 1;
         newBrightness = 1;
-        board.creatures.add(new Creature(newPX, newPY, 0, 0, 
+        board.addCreature(new Creature(newPX, newPY, 0, 0, 
           babySize, density, newHue, newSaturation, newBrightness, board, board.year, random(0, 2 * PI), 0, 
           stitchName(parentNames), andifyParents(parentNames), true, 
           newBrain, highestGen + 1, newMouthHue));

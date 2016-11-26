@@ -10,6 +10,9 @@ import java.util.Iterator;
 public interface AbstractBoardInterface {
   // Adds a new creature to the Board (reproduction)
   public void addCreature(Creature creature);
+  
+  // Creates a fresh, unique id
+  public int generateUniqueId();
 };
 
 /**
@@ -38,8 +41,9 @@ class Board implements AbstractBoardInterface {
   private ArrayList<Creature> newCreatures = new ArrayList<Creature>();
   private ArrayList<Creature> creatures = new ArrayList<Creature>(0);
 
+  private int uniqueIdCounter = 0; 
+
   Creature selectedCreature = null;
-  int creatureIDUpTo = 0;
   private int creatureRankMetric = 0;
   final int LIST_SLOTS = 6;
   Creature[] list = new Creature[LIST_SLOTS];
@@ -229,7 +233,7 @@ class Board implements AbstractBoardInterface {
             rect(85+(float)(multi / maxEnergy), y + 5, (float)(multi * (list[i].energy - 1) / maxEnergy), 25);
           }
           fill(0, 0, 1);
-          text(list[i].getCreatureName() + " [" + list[i].id + "] (" + toAge(list[i].birthTime) + ")", 90, y);
+          text(list[i].getCreatureName() + " [" + list[i].getId() + "] (" + toAge(list[i].birthTime) + ")", 90, y);
           text("Energy: " + nf(100 * (float)(list[i].energy), 0, 2), 90, y + 25);
         }
       }
@@ -357,6 +361,12 @@ class Board implements AbstractBoardInterface {
     return folder + "/" + modes[type] + "/" + nf(fileSaveCounts[type], 5) + ending;
   }
 
+  @Override
+  public synchronized int generateUniqueId() {
+    return uniqueIdCounter++;
+  };
+  
+  @Override
   public synchronized void addCreature(Creature newCreature) {
     newCreatures.add(newCreature);
   }

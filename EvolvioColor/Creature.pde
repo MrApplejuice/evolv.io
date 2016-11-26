@@ -19,7 +19,8 @@ class Creature extends SoftBody {
   String name;
   String parents;
   int gen;
-  int id;
+  
+  private int id;
 
   // Vision or View or Preference
   double MAX_VISION_DISTANCE = 10;
@@ -60,7 +61,6 @@ class Creature extends SoftBody {
     rotation = rot;
     vr = tvr;
     isCreature = true;
-    id = board.creatureIDUpTo+1;
     if (tname.length() >= 1) {
       if (mutateName) {
         name = nameGenerator.mutateName(tname);
@@ -72,7 +72,6 @@ class Creature extends SoftBody {
       name = nameGenerator.newName();
     }
     parents = tparents;
-    board.creatureIDUpTo++;
     //visionAngle = 0;
     //visionDistance = 0;
     //visionEndX = getVisionStartX();
@@ -82,6 +81,12 @@ class Creature extends SoftBody {
     }
     gen = tgen;
     mouthHue = tmouthHue;
+    
+    id = board.generateUniqueId();
+  }
+
+  public int getId() {
+    return id;
   }
 
   public void drawBrain(PFont font, float scaleUp, int mX, int mY) {

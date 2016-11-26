@@ -1,3 +1,12 @@
+static NameGenerator nameGenerator = null;
+{
+  synchronized (this) {
+    if (nameGenerator == null) {
+      nameGenerator = new NameGenerator();
+    }
+  }
+}
+
 class Creature extends SoftBody {
   // Energy
   double ACCELERATION_ENERGY = 0.18;
@@ -45,8 +54,6 @@ class Creature extends SoftBody {
   double rotation = 0;
   final double SAFE_SIZE = 1.25;
   final double MATURE_AGE = 0.01;
-
-  NameGenerator nameGenerator = new NameGenerator();
 
   public Creature(double tpx, double tpy, double tvx, double tvy, double tenergy, 
     double tdensity, double thue, double tsaturation, double tbrightness, Board tb, double bt, 

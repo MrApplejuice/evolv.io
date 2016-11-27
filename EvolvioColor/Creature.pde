@@ -193,9 +193,9 @@ class Creature extends SoftBody {
       accelerate(output[1], timeStep);
       turn(output[2], timeStep);
       eat(output[3], timeStep);
-      fight(output[4], timeStep * 100);
+      fight(output[4], timeStep * 100, currentYear);
       if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
-        reproduce(SAFE_SIZE, timeStep);
+        reproduce(SAFE_SIZE, timeStep, currentYear);
       }
       mouthHue = Math.abs(output[10]) % 1.0;
     }

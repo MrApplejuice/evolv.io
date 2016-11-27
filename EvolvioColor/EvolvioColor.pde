@@ -130,6 +130,8 @@ void exit() {
     }
   }
   
+  evoBoard.stop();
+  
   super.exit();
 }
 

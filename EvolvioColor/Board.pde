@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.List;
 import java.util.Iterator;
 
 /**
@@ -25,6 +26,96 @@ public interface AbstractBoardInterface {
   In the future the UI elements should als obe stripped from this class...
  */
 class Board implements AbstractBoardInterface {
+  /**
+    Class distributing the simulation of creatures among different
+    worker threads.
+   */
+  private class WorkDistributor {
+    private List<Creature> creatureList;
+    private int globalIndex = 0;
+    private int dispatchIndex = 0;
+    private boolean cycleRunning = false;
+    
+    private int cycleStartSize = 0;
+    
+    public WorkDistributor(List<Creature> creatureList) {
+      this.creatureList = creatureList;
+    }
+    
+    /**
+      Blocks until a new workitem can be popped.
+     */
+    public synchronized Creature popCreature() throws InterruptedException {
+      if (cycleRunning) {
+        System.out.println("returning from: " + globalIndex + "  " + cycleStartSize);
+        globalIndex++;
+      }
+      notifyAll();
+      while ((!cycleRunning) || (dispatchIndex >= cycleStartSize)) {
+        wait();
+      }
+      System.out.println("serving: " + dispatchIndex + "  " + cycleStartSize);
+      return creatureList.get(dispatchIndex++);
+    }
+    
+    /**
+      Restarts a new processing cycle. Blocks until the processing
+      cycle has finished.
+     */
+    public synchronized void cycle() {
+      try {
+        while (cycleRunning) {
+          wait();
+        }
+        
+        globalIndex = 0;
+        dispatchIndex = 0;
+        cycleStartSize = creatureList.size();
+        cycleRunning = true;
+        
+        notifyAll();
+        while (globalIndex < cycleStartSize) {
+          wait();
+        }
+        
+        cycleRunning = false;
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  };
+  
+  private class CreatureWorkerThread extends Thread {
+    private WorkDistributor workDistributor;
+    
+    public CreatureWorkerThread(WorkDistributor workDistributor) {
+      this.workDistributor = workDistributor;
+    }
+    
+    public void run() { 
+      while (!Thread.interrupted()) {
+        try {
+          final Creature me = workDistributor.popCreature();
+          me.collide(timeStep);
+          me.metabolize(timeStep, year);
+          me.useBrain(timeStep, !userControl, Board.this.year);
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  };
+
+  
+  public static final float MIN_CREATURE_ENERGY = 1.2;
+  public static final float MAX_CREATURE_ENERGY = 2.0;
+  public static final float MINIMUM_SURVIVABLE_SIZE = 0.06;
+  public static final float CREATURE_STROKE_WEIGHT = 0.6;
+
+  public static final int WORKER_THREAD_COUNT = 4;
+  
   // Board
   int boardWidth;
   int boardHeight;
@@ -32,17 +123,18 @@ class Board implements AbstractBoardInterface {
 
   // Creature
   int creatureMinimum;
-  final float MIN_CREATURE_ENERGY = 1.2;
-  final float MAX_CREATURE_ENERGY = 2.0;
-  final float MINIMUM_SURVIVABLE_SIZE = 0.06;
-  final float CREATURE_STROKE_WEIGHT = 0.6;
+  
   ArrayList[][] softBodiesInPositions;
+
+  private WorkDistributor workDistributor;
+  private List<Thread> workerThreads = new ArrayList<Thread>(); 
   
   private ArrayList<Creature> newCreatures = new ArrayList<Creature>();
   private ArrayList<Creature> creatures = new ArrayList<Creature>(0);
 
-  private int uniqueIdCounter = 0; 
-
+  private int uniqueIdCounter = 0;
+  
+  
   Creature selectedCreature = null;
   private int creatureRankMetric = 0;
   final int LIST_SLOTS = 6;
@@ -89,6 +181,7 @@ class Board implements AbstractBoardInterface {
   boolean userControl;
 
   final String[] sorts = {"Biggest", "Smallest", "Youngest", "Oldest", "A to Z", "Z to A", "Highest Gen", "Lowest Gen"};
+
 
 
   public Board(int w, int h, float stepSize, float min, float max, int rta, int cm, int SEED, String INITIAL_FILE_NAME, double ts) {
@@ -141,8 +234,29 @@ class Board implements AbstractBoardInterface {
     for (int i = 0; i < POPULATION_HISTORY_LENGTH; i++) {
       populationHistory[i] = 0;
     }
+    
+    workDistributor = new WorkDistributor(creatures);
+    for (int i = 0; i < WORKER_THREAD_COUNT; i++) {
+      final Thread newThread = new CreatureWorkerThread(workDistributor);
+      newThread.start();
+      workerThreads.add(newThread);
+    }
   }
-
+  
+  public synchronized void stop() {
+    try {
+      for (Thread thread : workerThreads) {
+        if (thread.isAlive()) {
+          thread.interrupt();
+          thread.join();
+        }
+      }
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+  
   public synchronized void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
     for (int x = 0; x < boardWidth; x++) {
       for (int y = 0; y < boardHeight; y++) {
@@ -406,41 +520,41 @@ class Board implements AbstractBoardInterface {
     mergeNewCreaturePool();
     maintainCreatureMinimum(false);
     
-    final Iterator<Creature> creatureIterator = creatures.iterator(); 
-    while (creatureIterator.hasNext()) {
-      final Creature me = creatureIterator.next();
-      me.collide(timeStep);
-      me.metabolize(timeStep, year);
-      me.useBrain(timeStep, !userControl, this.year);
-      if (userControl) {
-        if (me == selectedCreature) {
-          if (keyPressed) {
-            if (key == CODED) {
-              if (keyCode == UP) me.accelerate(0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == DOWN) me.accelerate(-0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == LEFT) me.turn(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == RIGHT) me.turn(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-            } else {
-              if (key == ' ') me.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'v' || key == 'V') me.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'f' || key == 'F')  me.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR, year);
-              if (key == 'u' || key == 'U') me.setHue(me.hue + 0.02);
-              if (key == 'j' || key == 'J') me.setHue(me.hue - 0.02);
+    if (userControl) {
+      if (selectedCreature != null) {
+        if (keyPressed) {
+          if (key == CODED) {
+            if (keyCode == UP) selectedCreature.accelerate(0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == DOWN) selectedCreature.accelerate(-0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == LEFT) selectedCreature.turn(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == RIGHT) selectedCreature.turn(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+          } else {
+            if (key == ' ') selectedCreature.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (key == 'v' || key == 'V') selectedCreature.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (key == 'f' || key == 'F')  selectedCreature.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR, year);
+            if (key == 'u' || key == 'U') selectedCreature.setHue(selectedCreature.hue + 0.02);
+            if (key == 'j' || key == 'J') selectedCreature.setHue(selectedCreature.hue - 0.02);
 
-              if (key == 'i' || key == 'I') me.setMouthHue(me.mouthHue + 0.02);
-              if (key == 'k' || key == 'K') me.setMouthHue(me.mouthHue - 0.02);
-              if (key == 'b' || key == 'B') {
-                if (!wasPressingB) {
-                  me.reproduce(MANUAL_BIRTH_SIZE, timeStep, year);
-                }
-                wasPressingB = true;
-              } else {
-                wasPressingB = false;
+            if (key == 'i' || key == 'I') selectedCreature.setMouthHue(selectedCreature.mouthHue + 0.02);
+            if (key == 'k' || key == 'K') selectedCreature.setMouthHue(selectedCreature.mouthHue - 0.02);
+            if (key == 'b' || key == 'B') {
+              if (!wasPressingB) {
+                selectedCreature.reproduce(MANUAL_BIRTH_SIZE, timeStep, year);
               }
+              wasPressingB = true;
+            } else {
+              wasPressingB = false;
             }
           }
         }
       }
+    } else {
+      workDistributor.cycle();
+    }
+
+    final Iterator<Creature> creatureIterator = creatures.iterator(); 
+    while (creatureIterator.hasNext()) {
+      final Creature me = creatureIterator.next();
       if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
         me.returnToEarth();
         creatureIterator.remove();
@@ -573,7 +687,7 @@ class Board implements AbstractBoardInterface {
       if (choosePreexisting) {
         Creature c = getRandomCreature();
         c.addEnergy(c.SAFE_SIZE);
-        c.reproduce(c.SAFE_SIZE, timeStep);
+        c.reproduce(c.SAFE_SIZE, timeStep, year);
       } else {
         creatures.add(new Creature(random(0, boardWidth), random(0, boardHeight), 0, 0, 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 

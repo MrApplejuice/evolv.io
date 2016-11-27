@@ -5,12 +5,13 @@ class Brain {
   final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
   final double AXON_START_MUTABILITY = 0.0005;
   final double STARTING_AXON_VARIABILITY = 1.0;
-  Axon[][][] axons;
-  double[][] neurons;
+  
+  private Axon[][][] axons;
+  private double[][] neurons;
 
   //labels
-  String[] inputLabels = new String[BRAIN_HEIGHT];
-  String[] outputLabels = new String[BRAIN_HEIGHT];
+  private String[] inputLabels = new String[BRAIN_HEIGHT];
+  private String[] outputLabels = new String[BRAIN_HEIGHT];
 
   public Brain(Axon[][][] tbrain, double[][] tneurons) {
     //initialize brain

@@ -1,6 +1,121 @@
 import java.io.*;
+import java.util.List;
+import java.util.Iterator;
 
-class Board {
+/**
+  More abstraction layers to /some/ interaction between Creatues and the board.
+  
+  This must be in a super-controlled manner however to make multithreading efficient 
+  and also prevent deadlocks.
+ */
+public interface AbstractBoardInterface {
+  // Adds a new creature to the Board (reproduction)
+  public void addCreature(Creature creature);
+  
+  // Creates a fresh, unique id
+  public int generateUniqueId();
+};
+
+/**
+  This class exposes variables to EVERYTHING. Efficient parallelization
+  of execution is not possible while other classes are so tightly coupled 
+  with this class. I will spend some work on making more of this class private
+  so that especially Creatures can be somewhat more decoupled from the board
+  they live on.
+  
+  In the future the UI elements should als obe stripped from this class...
+ */
+class Board implements AbstractBoardInterface {
+  /**
+    Class distributing the simulation of creatures among different
+    worker threads.
+   */
+  private class WorkDistributor {
+    private List<Creature> creatureList;
+    private int globalIndex = 0;
+    private int dispatchIndex = 0;
+    private boolean cycleRunning = false;
+    
+    private int cycleStartSize = 0;
+    
+    public WorkDistributor(List<Creature> creatureList) {
+      this.creatureList = creatureList;
+    }
+    
+    /**
+      Blocks until a new workitem can be popped.
+     */
+    public synchronized Creature popCreature() throws InterruptedException {
+      if (cycleRunning) {
+        System.out.println("returning from: " + globalIndex + "  " + cycleStartSize);
+        globalIndex++;
+      }
+      notifyAll();
+      while ((!cycleRunning) || (dispatchIndex >= cycleStartSize)) {
+        wait();
+      }
+      System.out.println("serving: " + dispatchIndex + "  " + cycleStartSize);
+      return creatureList.get(dispatchIndex++);
+    }
+    
+    /**
+      Restarts a new processing cycle. Blocks until the processing
+      cycle has finished.
+     */
+    public synchronized void cycle() {
+      try {
+        while (cycleRunning) {
+          wait();
+        }
+        
+        globalIndex = 0;
+        dispatchIndex = 0;
+        cycleStartSize = creatureList.size();
+        cycleRunning = true;
+        
+        notifyAll();
+        while (globalIndex < cycleStartSize) {
+          wait();
+        }
+        
+        cycleRunning = false;
+      }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  };
+  
+  private class CreatureWorkerThread extends Thread {
+    private WorkDistributor workDistributor;
+    
+    public CreatureWorkerThread(WorkDistributor workDistributor) {
+      this.workDistributor = workDistributor;
+    }
+    
+    public void run() { 
+      while (!Thread.interrupted()) {
+        try {
+          final Creature me = workDistributor.popCreature();
+          me.collide(timeStep);
+          me.metabolize(timeStep, year);
+          me.useBrain(timeStep, !userControl, Board.this.year);
+        }
+        catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  };
+
+  
+  public static final float MIN_CREATURE_ENERGY = 1.2;
+  public static final float MAX_CREATURE_ENERGY = 2.0;
+  public static final float MINIMUM_SURVIVABLE_SIZE = 0.06;
+  public static final float CREATURE_STROKE_WEIGHT = 0.6;
+
+  public static final int WORKER_THREAD_COUNT = 4;
+  
   // Board
   int boardWidth;
   int boardHeight;
@@ -8,14 +123,19 @@ class Board {
 
   // Creature
   int creatureMinimum;
-  final float MIN_CREATURE_ENERGY = 1.2;
-  final float MAX_CREATURE_ENERGY = 2.0;
-  final float MINIMUM_SURVIVABLE_SIZE = 0.06;
-  final float CREATURE_STROKE_WEIGHT = 0.6;
+  
   ArrayList[][] softBodiesInPositions;
-  ArrayList<Creature> creatures;
+
+  private WorkDistributor workDistributor;
+  private List<Thread> workerThreads = new ArrayList<Thread>(); 
+  
+  private ArrayList<Creature> newCreatures = new ArrayList<Creature>();
+  private ArrayList<Creature> creatures = new ArrayList<Creature>(0);
+
+  private int uniqueIdCounter = 0;
+  
+  
   Creature selectedCreature = null;
-  int creatureIDUpTo = 0;
   private int creatureRankMetric = 0;
   final int LIST_SLOTS = 6;
   Creature[] list = new Creature[LIST_SLOTS];
@@ -63,6 +183,7 @@ class Board {
   final String[] sorts = {"Biggest", "Smallest", "Youngest", "Oldest", "A to Z", "Z to A", "Highest Gen", "Lowest Gen"};
 
 
+
   public Board(int w, int h, float stepSize, float min, float max, int rta, int cm, int SEED, String INITIAL_FILE_NAME, double ts) {
     noiseSeed(SEED);
     randomSeed(SEED);
@@ -96,7 +217,6 @@ class Board {
     }
 
     creatureMinimum = cm;
-    creatures = new ArrayList<Creature>(0);
     maintainCreatureMinimum(false);
     for (int i = 0; i < LIST_SLOTS; i++) {
       list[i] = null;
@@ -114,9 +234,30 @@ class Board {
     for (int i = 0; i < POPULATION_HISTORY_LENGTH; i++) {
       populationHistory[i] = 0;
     }
+    
+    workDistributor = new WorkDistributor(creatures);
+    for (int i = 0; i < WORKER_THREAD_COUNT; i++) {
+      final Thread newThread = new CreatureWorkerThread(workDistributor);
+      newThread.start();
+      workerThreads.add(newThread);
+    }
   }
-
-  public void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
+  
+  public synchronized void stop() {
+    try {
+      for (Thread thread : workerThreads) {
+        if (thread.isAlive()) {
+          thread.interrupt();
+          thread.join();
+        }
+      }
+    }
+    catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+  
+  public synchronized void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
     for (int x = 0; x < boardWidth; x++) {
       for (int y = 0; y < boardHeight; y++) {
         tiles[x][y].drawTile(scaleUp, (mX == x && mY == y));
@@ -130,12 +271,12 @@ class Board {
     }
   }
 
-  public void drawBlankBoard(float scaleUp) {
+  public synchronized void drawBlankBoard(float scaleUp) {
     fill(BACKGROUND_COLOR);
     rect(0, 0, scaleUp * boardWidth, scaleUp * boardHeight);
   }
 
-  public void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
+  public synchronized void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
     fill(0, 0, 0);
     noStroke();
     rect(x1, y1, x2 - x1, y2 - y1);
@@ -206,7 +347,7 @@ class Board {
             rect(85+(float)(multi / maxEnergy), y + 5, (float)(multi * (list[i].energy - 1) / maxEnergy), 25);
           }
           fill(0, 0, 1);
-          text(list[i].getCreatureName() + " [" + list[i].id + "] (" + toAge(list[i].birthTime) + ")", 90, y);
+          text(list[i].getCreatureName() + " [" + list[i].getId() + "] (" + toAge(list[i].birthTime) + ")", 90, y);
           text("Energy: " + nf(100 * (float)(list[i].energy), 0, 2), 90, y + 25);
         }
       }
@@ -309,7 +450,7 @@ class Board {
     }
   }
 
-  void drawPopulationGraph(float x1, float x2, float y1, float y2) {
+  private synchronized void drawPopulationGraph(float x1, float x2, float y1, float y2) {
     float barWidth = (x2 - x1) / ((float)(POPULATION_HISTORY_LENGTH));
     noStroke();
     fill(0.33333, 1, 0.6);
@@ -325,7 +466,7 @@ class Board {
     }
   }
 
-  String getNextFileName(int type) {
+  public synchronized String getNextFileName(int type) {
     String[] modes = {"manualImgs", "autoImgs", "manualTexts", "autoTexts"};
     String ending = ".png";
     if (type >= 2) {
@@ -334,7 +475,17 @@ class Board {
     return folder + "/" + modes[type] + "/" + nf(fileSaveCounts[type], 5) + ending;
   }
 
-  public void iterate(double timeStep) {
+  @Override
+  public synchronized int generateUniqueId() {
+    return uniqueIdCounter++;
+  };
+  
+  @Override
+  public synchronized void addCreature(Creature newCreature) {
+    newCreatures.add(newCreature);
+  }
+
+  public synchronized void iterate(double timeStep) {
     double prevYear = year;
     year += timeStep;
     if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
@@ -358,63 +509,67 @@ class Board {
      tiles[x][y].iterate(this, year);
      }
      }*/
-    for (int i = 0; i < creatures.size(); i++) {
-      creatures.get(i).setPreviousEnergy();
+    for (final Creature creature : creatures) {
+      creature.setPreviousEnergy();
     }
     /*for(int i = 0; i < rocks.size(); i++) {
      rocks.get(i).collide(timeStep*OBJECT_TIMESTEPS_PER_YEAR);
      }*/
+     
+    // Fillup creature pool (first with children, then with new creatures)
+    mergeNewCreaturePool();
     maintainCreatureMinimum(false);
-    for (int i = 0; i < creatures.size(); i++) {
-      Creature me = creatures.get(i);
-      me.collide(timeStep);
-      me.metabolize(timeStep);
-      me.useBrain(timeStep, !userControl);
-      if (userControl) {
-        if (me == selectedCreature) {
-          if (keyPressed) {
-            if (key == CODED) {
-              if (keyCode == UP) me.accelerate(0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == DOWN) me.accelerate(-0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == LEFT) me.turn(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (keyCode == RIGHT) me.turn(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-            } else {
-              if (key == ' ') me.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'v' || key == 'V') me.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'f' || key == 'F')  me.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-              if (key == 'u' || key == 'U') me.setHue(me.hue + 0.02);
-              if (key == 'j' || key == 'J') me.setHue(me.hue - 0.02);
+    
+    if (userControl) {
+      if (selectedCreature != null) {
+        if (keyPressed) {
+          if (key == CODED) {
+            if (keyCode == UP) selectedCreature.accelerate(0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == DOWN) selectedCreature.accelerate(-0.04, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == LEFT) selectedCreature.turn(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (keyCode == RIGHT) selectedCreature.turn(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+          } else {
+            if (key == ' ') selectedCreature.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (key == 'v' || key == 'V') selectedCreature.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            if (key == 'f' || key == 'F')  selectedCreature.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR, year);
+            if (key == 'u' || key == 'U') selectedCreature.setHue(selectedCreature.hue + 0.02);
+            if (key == 'j' || key == 'J') selectedCreature.setHue(selectedCreature.hue - 0.02);
 
-              if (key == 'i' || key == 'I') me.setMouthHue(me.mouthHue + 0.02);
-              if (key == 'k' || key == 'K') me.setMouthHue(me.mouthHue - 0.02);
-              if (key == 'b' || key == 'B') {
-                if (!wasPressingB) {
-                  me.reproduce(MANUAL_BIRTH_SIZE, timeStep);
-                }
-                wasPressingB = true;
-              } else {
-                wasPressingB = false;
+            if (key == 'i' || key == 'I') selectedCreature.setMouthHue(selectedCreature.mouthHue + 0.02);
+            if (key == 'k' || key == 'K') selectedCreature.setMouthHue(selectedCreature.mouthHue - 0.02);
+            if (key == 'b' || key == 'B') {
+              if (!wasPressingB) {
+                selectedCreature.reproduce(MANUAL_BIRTH_SIZE, timeStep, year);
               }
+              wasPressingB = true;
+            } else {
+              wasPressingB = false;
             }
           }
         }
       }
+    } else {
+      workDistributor.cycle();
+    }
+
+    final Iterator<Creature> creatureIterator = creatures.iterator(); 
+    while (creatureIterator.hasNext()) {
+      final Creature me = creatureIterator.next();
       if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
         me.returnToEarth();
-        creatures.remove(me);
-        i--;
+        creatureIterator.remove();
       }
     }
     finishIterate(timeStep);
   }
 
-  public void finishIterate(double timeStep) {
-    for (int i = 0; i < rocks.size(); i++) {
-      rocks.get(i).applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+  public synchronized void finishIterate(double timeStep) {
+    for (final SoftBody rock : rocks) {
+      rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
-    for (int i = 0; i < creatures.size(); i++) {
-      creatures.get(i).applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-      creatures.get(i).see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+    for (final Creature creature : creatures) {
+      creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+      creature.see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
     if (Math.floor(fileSaveTimes[1] / imageSaveInterval) != Math.floor(year / imageSaveInterval)) {
       prepareForFileSave(1);
@@ -439,7 +594,7 @@ class Board {
     return (year % 1.0);
   }
 
-  private void drawThermometer(float x1, float y1, float w, float h, double prog, double min, double max, 
+  private synchronized void drawThermometer(float x1, float y1, float w, float h, double prog, double min, double max, 
     color fillColor) {
     noStroke();
     fill(0, 0, 0.2);
@@ -522,18 +677,24 @@ class Board {
     return nf((float)(year - d), 0, 2) + " yrs old";
   }
 
+  private synchronized void mergeNewCreaturePool() {
+    this.creatures.addAll(this.newCreatures);
+    this.newCreatures.clear();
+  }
+
   private void maintainCreatureMinimum(boolean choosePreexisting) {
-    while (creatures.size() < creatureMinimum) {
+    while ((newCreatures.size() + creatures.size()) < creatureMinimum) {
       if (choosePreexisting) {
         Creature c = getRandomCreature();
         c.addEnergy(c.SAFE_SIZE);
-        c.reproduce(c.SAFE_SIZE, timeStep);
+        c.reproduce(c.SAFE_SIZE, timeStep, year);
       } else {
         creatures.add(new Creature(random(0, boardWidth), random(0, boardHeight), 0, 0, 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 
           this, year, random(0, 2 * PI), 0, "", "[PRIMORDIAL]", true, null, 1, random(0, 1)));
       }
     }
+    mergeNewCreaturePool();
   }
 
   private Creature getRandomCreature() {
@@ -573,11 +734,11 @@ class Board {
     }
   }
   
-  public void incrementSort() {
+  public synchronized void incrementSort() {
     evoBoard.creatureRankMetric = (evoBoard.creatureRankMetric + 1) % sorts.length;
   }
   
-  public void decrementSort() {
+  public synchronized void decrementSort() {
     evoBoard.creatureRankMetric = (evoBoard.creatureRankMetric + sorts.length - 1) % sorts.length;
   }
 

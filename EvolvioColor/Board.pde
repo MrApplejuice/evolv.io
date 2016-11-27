@@ -14,6 +14,24 @@ public interface AbstractBoardInterface {
   
   // Creates a fresh, unique id
   public int generateUniqueId();
+
+  public int getBoardWidth();
+  public int getBoardHeight();
+  
+  // Returns the board's background color
+  public color getBackgroundColor();
+  
+  /**
+    Returns a tile's color given its x and y coordinate.
+    If x and y are outside the board size, the result
+    will be the background color
+   */
+  public color getTileColor(Vector2D pos);
+  
+  /**
+     Returns the a list of soft bodies at the given location.
+   */
+  public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos);
 };
 
 /**
@@ -243,6 +261,30 @@ class Board implements AbstractBoardInterface {
     }
   }
   
+  @Override
+  public int getBoardWidth() {
+    return boardWidth;
+  }
+  
+  @Override
+  public int getBoardHeight() {
+    return boardHeight;
+  }
+  
+  @Override
+  public color getBackgroundColor() {
+    return BACKGROUND_COLOR;
+  }
+  
+  @Override
+  public synchronized color getTileColor(Vector2D pos) {
+    if (pos.getX() >= 0 && pos.getX() < boardWidth && pos.getY() >= 0 && pos.getY() < boardHeight) {
+      return tiles[(int) pos.getX()][(int) pos.getY()].getColor();
+    } else {
+      return BACKGROUND_COLOR;
+    }
+  }
+
   public synchronized void stop() {
     try {
       for (Thread thread : workerThreads) {
@@ -485,40 +527,54 @@ class Board implements AbstractBoardInterface {
     newCreatures.add(newCreature);
   }
 
-  public synchronized void iterate(double timeStep) {
-    double prevYear = year;
-    year += timeStep;
-    if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
-      for (int i = POPULATION_HISTORY_LENGTH - 1; i >= 1; i--) {
-        populationHistory[i] = populationHistory[i - 1];
-      }
-      populationHistory[0] = creatures.size();
-    }
-    temperature = getGrowthRate(getSeason());
-    double tempChangeIntoThisFrame = temperature - getGrowthRate(getSeason() - timeStep);
-    double tempChangeOutOfThisFrame = getGrowthRate(getSeason() + timeStep) - temperature;
-    if (tempChangeIntoThisFrame * tempChangeOutOfThisFrame <= 0) { // Temperature change flipped direction.
-      for (int x = 0; x < boardWidth; x++) {
-        for (int y = 0; y < boardHeight; y++) {
-          tiles[x][y].iterate();
+  private boolean isIterating = false;
+  public void iterate(double timeStep) {
+    synchronized (this) {
+      try {
+        while (isIterating) {
+          wait();
         }
       }
+      catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+      isIterating = true;
+      
+      double prevYear = year;
+      year += timeStep;
+      if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
+        for (int i = POPULATION_HISTORY_LENGTH - 1; i >= 1; i--) {
+          populationHistory[i] = populationHistory[i - 1];
+        }
+        populationHistory[0] = creatures.size();
+      }
+      temperature = getGrowthRate(getSeason());
+      double tempChangeIntoThisFrame = temperature - getGrowthRate(getSeason() - timeStep);
+      double tempChangeOutOfThisFrame = getGrowthRate(getSeason() + timeStep) - temperature;
+      if (tempChangeIntoThisFrame * tempChangeOutOfThisFrame <= 0) { // Temperature change flipped direction.
+        for (int x = 0; x < boardWidth; x++) {
+          for (int y = 0; y < boardHeight; y++) {
+            tiles[x][y].iterate();
+          }
+        }
+      }
+      /*for(int x = 0; x < boardWidth; x++) {
+       for(int y = 0; y < boardHeight; y++) {
+       tiles[x][y].iterate(this, year);
+       }
+       }*/
+      for (final Creature creature : creatures) {
+        creature.setPreviousEnergy();
+      }
+      /*for(int i = 0; i < rocks.size(); i++) {
+       rocks.get(i).collide(timeStep*OBJECT_TIMESTEPS_PER_YEAR);
+       }*/
+       
+      // Fillup creature pool (first with children, then with new creatures)
+      mergeNewCreaturePool();
+      maintainCreatureMinimum(false);
     }
-    /*for(int x = 0; x < boardWidth; x++) {
-     for(int y = 0; y < boardHeight; y++) {
-     tiles[x][y].iterate(this, year);
-     }
-     }*/
-    for (final Creature creature : creatures) {
-      creature.setPreviousEnergy();
-    }
-    /*for(int i = 0; i < rocks.size(); i++) {
-     rocks.get(i).collide(timeStep*OBJECT_TIMESTEPS_PER_YEAR);
-     }*/
-     
-    // Fillup creature pool (first with children, then with new creatures)
-    mergeNewCreaturePool();
-    maintainCreatureMinimum(false);
     
     if (userControl) {
       if (selectedCreature != null) {
@@ -552,15 +608,20 @@ class Board implements AbstractBoardInterface {
       workDistributor.cycle();
     }
 
-    final Iterator<Creature> creatureIterator = creatures.iterator(); 
-    while (creatureIterator.hasNext()) {
-      final Creature me = creatureIterator.next();
-      if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
-        me.returnToEarth();
-        creatureIterator.remove();
+    synchronized (this) {
+      final Iterator<Creature> creatureIterator = creatures.iterator(); 
+      while (creatureIterator.hasNext()) {
+        final Creature me = creatureIterator.next();
+        if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
+          me.returnToEarth();
+          creatureIterator.remove();
+        }
       }
+      finishIterate(timeStep);
+      
+      isIterating = false;
+      notify();
     }
-    finishIterate(timeStep);
   }
 
   public synchronized void finishIterate(double timeStep) {

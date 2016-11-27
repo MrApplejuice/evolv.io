@@ -78,13 +78,6 @@ class Creature extends SoftBody implements OrientedBody {
       name = nameGenerator.newName();
     }
     parents = tparents;
-    //visionAngle = 0;
-    //visionDistance = 0;
-    //visionEndX = getVisionStartX();
-    //visionEndY = getVisionStartY();
-    for (int i = 0; i < 9; i++) {
-      visionResults[i] = 0;
-    }
     gen = tgen;
     mouthHue = tmouthHue;
     
@@ -133,7 +126,7 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void drawVisionAngles(Board board, float scaleUp) {
-    for (int i = 0; i < visionAngles.length; i++) {
+    /*for (int i = 0; i < visionAngles.length; i++) {
       color visionUIcolor = color(0, 0, 1);
       if (visionResults[i * 3 + 2] > BRIGHTNESS_THRESHOLD) {
         visionUIcolor = color(0, 0, 0);
@@ -152,7 +145,7 @@ class Creature extends SoftBody implements OrientedBody {
         (float)((visionOccludedX[i] + CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] + CROSS_SIZE) * scaleUp));
       line((float)((visionOccludedX[i] - CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] + CROSS_SIZE) * scaleUp), 
         (float)((visionOccludedX[i] + CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] - CROSS_SIZE) * scaleUp));
-    }
+    }*/
   }
 
   public void drawMouth(Board board, float scaleUp, double radius, double rotation, float camZoom, double mouthHue) {
@@ -279,15 +272,14 @@ class Creature extends SoftBody implements OrientedBody {
   }
   
   private Tile getRandomCoveredTile() {
-    double radius = (float) getRadius();
-    double choiceX = 0;
-    double choiceY = 0;
-    while (dist((float)px, (float)py, (float)choiceX, (float)choiceY) > radius) {
+    Vector2D choice = globalLinAlgPool.getVector2D().set(0, 0);
+    while (dist((float)px, (float)py, (float) _choiceX, (float) _choiceY) > radius) {
       choiceX = (Math.random() * 2 * radius - radius) + px;
       choiceY = (Math.random() * 2 * radius - radius) + py;
     }
     int x = xBound((int)choiceX);
     int y = yBound((int)choiceY);
+    globalLinAlgPool.recycle(choice);
     return board.tiles[x][y];
   }
 

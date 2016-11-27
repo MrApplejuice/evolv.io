@@ -1,100 +1,112 @@
+import java.awt.Color; 
+
 /**
   Implements 2D vision system of a creature.  
  */
 static class VisionSystem {
   public final double MAX_VISION_DISTANCE = 10;
   
-  double[] visionAngles = {0, -0.4, 0.4};
-  double[] visionDistances = {0, 0.7, 0.7};
-  //double visionAngle;
-  //double visionDistance;
-  double[] visionOccludedX = new double[visionAngles.length];
-  double[] visionOccludedY = new double[visionAngles.length];
+  private LinearAlgebraPool linAlgPool;
   
-  private double[] visionValues;
+  private double[] visionAngles = {0, -0.4, 0.4};
+  private double[] visionDistances = {0, 0.7, 0.7};
   
-  private double getVisionEndX(int i) {
-    double visionTotalAngle = rotation + visionAngles[i];
-    return px + visionDistances[i] * Math.cos(visionTotalAngle);
-  }
-
-  private double getVisionEndY(int i) {
-    double visionTotalAngle = rotation + visionAngles[i];
-    return py + visionDistances[i] * Math.sin(visionTotalAngle);
-  }
+  private Vector2D[] visionOccluded = new Vector2D[visionAngles.length];
   
-  private color getColorAt(Vector2D v) {
-    final double x = v.getX();
-    final double y = v.getY();
-    if (x >= 0 && x < board.boardWidth && y >= 0 && y < board.boardHeight) {
-      return board.tiles[(int)(x)][(int)(y)].getColor();
-    } else {
-      return board.BACKGROUND_COLOR;
+  private ArrayList<SoftBody> potentialVisionOccluders = new ArrayList<SoftBody>();
+  
+  private double[] visionValues = new double[visionAngles.length * 3];
+  
+  
+  public VisionSystem(LinearAlgebraPool linAlgPool) {
+    this.linAlgPool = linAlgPool;
+    
+    for (int i = 0; i < visionOccluded.length; i++) {
+      visionOccluded[i] = new Vector2D(); // Unpooled, these are static anyway! 
     }
   }
-
-  public void updateVision(Vector2D origin) {
+  
+  public void updateVision(AbstractBoardInterface board, Vector2D origin, double rotation, Object ignore) {
+    float[] hsbValues = new float[3];
+    
+    final Vector2D tmpV = linAlgPool.getVector2D();
     for (int k = 0; k < visionAngles.length; k++) {
-      double visionTotalAngle = rotation + visionAngles[k];
+      final double visionTotalAngle = rotation + visionAngles[k];
 
-      double endX = getVisionEndX(k);
-      double endY = getVisionEndY(k);
-
-      visionOccludedX[k] = endX;
-      visionOccludedY[k] = endY;
-      color c = getColorAt(endX, endY);
-      visionResults[k * 3] = hue(c);
-      visionResults[k * 3 + 1] = saturation(c);
-      visionResults[k * 3 + 2] = brightness(c);
-
-      int tileX = 0;
-      int tileY = 0;
-      int prevTileX = -1;
-      int prevTileY = -1;
-      ArrayList<SoftBody> potentialVisionOccluders = new ArrayList<SoftBody>();
+      visionOccluded[k].set(visionDistances[k] * Math.cos(visionTotalAngle),
+                            visionDistances[k] * Math.sin(visionTotalAngle));
+      visionOccluded[k].inplaceAdd(origin);
+      
+      // Iterative line propagation - perhaps use a default here like Bresenham's or Wu's line algorithm?
+      Vector2D currentTile = null;
+      Vector2D prevTile = null;
       for (int DAvision = 0; DAvision < visionDistances[k] + 1; DAvision++) {
-        tileX = (int)(visionStartX + Math.cos(visionTotalAngle) * DAvision);
-        tileY = (int)(visionStartY + Math.sin(visionTotalAngle) * DAvision);
-        if (tileX != prevTileX || tileY != prevTileY) {
-          addPVOs(tileX, tileY, potentialVisionOccluders);
-          if (prevTileX >= 0 && tileX != prevTileX && tileY != prevTileY) {
-            addPVOs(prevTileX, tileY, potentialVisionOccluders);
-            addPVOs(tileX, prevTileY, potentialVisionOccluders);
+        currentTile = linAlgPool.getVector2D().set((int) (origin.getX() + Math.cos(visionTotalAngle) * DAvision),
+                                                   (int) (origin.getY() + Math.sin(visionTotalAngle) * DAvision));
+        if (!currentTile.equals(prevTile)) {
+          potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(currentTile));
+          if ((prevTile != null) && (prevTile.getX() != currentTile.getX()) && (prevTile.getY() != currentTile.getY())) {
+            tmpV.set(prevTile.getX(), currentTile.getX());
+            potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(tmpV));
+            tmpV.set(currentTile.getX(), prevTile.getX());
+            potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(tmpV));
           }
         }
-        prevTileX = tileX;
-        prevTileY = tileY;
+        
+        linAlgPool.recycle(prevTile);
+        prevTile = currentTile;
+        currentTile = null;
       }
-      double[][] rotationMatrix = new double[2][2];
-      rotationMatrix[1][1] = rotationMatrix[0][0] = Math.cos(-visionTotalAngle);
-      rotationMatrix[0][1] = Math.sin(-visionTotalAngle);
-      rotationMatrix[1][0] = -rotationMatrix[0][1];
-      double visionLineLength = visionDistances[k];
-      for (int i = 0; i < potentialVisionOccluders.size(); i++) {
-        SoftBody body = potentialVisionOccluders.get(i);
-        double x = body.px-px;
-        double y = body.py-py;
-        double r = body.getRadius();
-        double translatedX = rotationMatrix[0][0] * x + rotationMatrix[1][0] * y;
-        double translatedY = rotationMatrix[0][1] * x + rotationMatrix[1][1] * y;
-        if (Math.abs(translatedY) <= r) {
-          if ((translatedX >= 0 && translatedX < visionLineLength && translatedY < visionLineLength) ||
-            distance(0, 0, translatedX, translatedY) < r ||
-            distance(visionLineLength, 0, translatedX, translatedY) < r) { // YES! There is an occlussion.
-            visionLineLength = translatedX-Math.sqrt(r * r - translatedY * translatedY);
-            visionOccludedX[k] = visionStartX + visionLineLength * Math.cos(visionTotalAngle);
-            visionOccludedY[k] = visionStartY + visionLineLength * Math.sin(visionTotalAngle);
-            visionResults[k * 3] = body.hue;
-            visionResults[k * 3 + 1] = body.saturation;
-            visionResults[k * 3 + 2] = body.brightness;
+      linAlgPool.recycle(prevTile);
+      
+      final Matrix2D unrotateMatrix = linAlgPool.getMatrix2D().setRotationMatrix(-visionTotalAngle);
+      final Vector2D visionEndTip = linAlgPool.getVector2D().set(visionDistances[k], 0);
+      for (SoftBody body : potentialVisionOccluders) {
+        if (body == ignore) {
+          continue;
+        }
+        
+        final Vector2D pos = linAlgPool.getVector2D().set(body.px, body.py);
+        pos.inplaceSub(origin);
+        
+        final double radius = body.getRadius();
+        final Vector2D rotatedPos = unrotateMatrix.dotProduct(pos);
+        
+        if (Math.abs(rotatedPos.getY()) <= radius) { // Test: Sphere of the other body intersects with the vision beam
+          if ((rotatedPos.getX() >= 0 && rotatedPos.getX() < visionEndTip.getX() && rotatedPos.getY() < visionEndTip.getX()) || // I get the X-checks: a rough check (ignoring the effective projected radius) on "falls withing vision range". I do not get the Y-part.   
+            rotatedPos.length() < radius || // Is the vision origin within the collision sphere?
+            visionEndTip.distance(rotatedPos) < radius) {  // Very crude check checking if the vision end point falls inside the collision sphere
+            // YES! There is an occlussion.
+            visionEndTip.set(rotatedPos.getX() - Math.sqrt(radius * radius - rotatedPos.getY() * rotatedPos.getY()), 0);
           }
         }
+
+        
+        linAlgPool.recycle(pos);
+        linAlgPool.recycle(rotatedPos);
       }
+      
+      // Save vision end position and colors
+      visionOccluded[k].set(visionEndTip.getX() * Math.cos(visionTotalAngle),
+                            visionEndTip.getY() * Math.sin(visionTotalAngle));
+      visionOccluded[k].inplaceAdd(origin);
+      
+      color c = board.getTileColor(visionOccluded[k]);
+      // Cannot use the hue/saturation/brightness functions in a static class :-(
+      Color.RGBtoHSB((c >> 16) & 0xFF, (c >> 8) & 0xFF, (c >> 0) & 0xFF, hsbValues);
+      visionValues[k * 3] = hsbValues[0];
+      visionValues[k * 3 + 1] = hsbValues[1];
+      visionValues[k * 3 + 2] = hsbValues[2];
+      
+      linAlgPool.recycle(visionEndTip);
+      linAlgPool.recycle(unrotateMatrix);
     }
+    
+    linAlgPool.recycle(tmpV);
   }
-  
-  public void addPVOs(Board board, int x, int y, ArrayList<SoftBody> PVOs) {
-    if (x >= 0 && x < board.boardWidth && y >= 0 && y < board.boardHeight) {
+  /*
+  private void addPVOs(AbstractBoardInterface board, Object ignore, Vector2D pos, ArrayList<SoftBody> PVOs) {
+    if (x >= 0 && x < board.getBoardWidth() && y >= 0 && y < board.getBoardHeight()) {
       for (int i = 0; i < board.softBodiesInPositions[x][y].size(); i++) {
         SoftBody newCollider = (SoftBody)board.softBodiesInPositions[x][y].get(i);
         if (!PVOs.contains(newCollider) && newCollider != this) {
@@ -102,5 +114,9 @@ static class VisionSystem {
         }
       }
     }
+  }
+  */
+  public double[] getValues() {
+    return visionValues;
   }
 }

@@ -104,18 +104,7 @@ static class VisionSystem {
     
     linAlgPool.recycle(tmpV);
   }
-  /*
-  private void addPVOs(AbstractBoardInterface board, Object ignore, Vector2D pos, ArrayList<SoftBody> PVOs) {
-    if (x >= 0 && x < board.getBoardWidth() && y >= 0 && y < board.getBoardHeight()) {
-      for (int i = 0; i < board.softBodiesInPositions[x][y].size(); i++) {
-        SoftBody newCollider = (SoftBody)board.softBodiesInPositions[x][y].get(i);
-        if (!PVOs.contains(newCollider) && newCollider != this) {
-          PVOs.add(newCollider);
-        }
-      }
-    }
-  }
-  */
+
   public double[] getValues() {
     return visionValues;
   }

@@ -8,6 +8,8 @@ static NameGenerator nameGenerator = null;
 }
 
 class Creature extends SoftBody implements OrientedBody {
+  private LinearAlgebraPool creatureLinAlgPool = new LinearAlgebraPool(); 
+  
   // Energy
   double ACCELERATION_ENERGY = 0.18;
   double ACCELERATION_BACK_ENERGY = 0.24;
@@ -35,6 +37,7 @@ class Creature extends SoftBody implements OrientedBody {
   final double FOOD_SENSITIVITY = 0.3;
   final double MAX_DETAILED_ZOOM = 3.5; // Maximum zoom to draw details at
 
+  private VisionSystem visionSystem = new VisionSystem(creatureLinAlgPool);
   
   Brain brain;
   final float BRIGHTNESS_THRESHOLD = 0.7;
@@ -169,9 +172,11 @@ class Creature extends SoftBody implements OrientedBody {
   //////////////////// SIMULATION FUNCTIONS ////////////////////
 
   public void useBrain(double timeStep, boolean useOutput, double currentYear) {
-    double inputs[]= new double[11];
+    double inputs[] = new double[11];
+    
+    double[] visionValues = visionSystem.getValues();
     for (int i = 0; i < 9; i++) {
-      inputs[i] = visionResults[i];
+      inputs[i] = visionValues[i];
     }
     inputs[9]= energy;
     inputs[10] = mouthHue;
@@ -272,14 +277,22 @@ class Creature extends SoftBody implements OrientedBody {
   }
   
   private Tile getRandomCoveredTile() {
-    Vector2D choice = globalLinAlgPool.getVector2D().set(0, 0);
-    while (dist((float)px, (float)py, (float) _choiceX, (float) _choiceY) > radius) {
-      choiceX = (Math.random() * 2 * radius - radius) + px;
-      choiceY = (Math.random() * 2 * radius - radius) + py;
+    double radius = getRadius();
+
+    Vector2D choice = creatureLinAlgPool.getVector2D().set(0, 0);
+    Vector2D pos = creatureLinAlgPool.getVector2D().set(px, py);
+    
+    while (choice.distance(pos) > radius) {
+      choice.set(Math.random() * 2 * radius - radius,
+                 Math.random() * 2 * radius - radius);
+      choice.inplaceAdd(pos);
     }
-    int x = xBound((int)choiceX);
-    int y = yBound((int)choiceY);
-    globalLinAlgPool.recycle(choice);
+    int x = xBound((int) choice.getX());
+    int y = yBound((int) choice.getY());
+    
+    creatureLinAlgPool.recycle(choice);
+    creatureLinAlgPool.recycle(pos);
+    
     return board.tiles[x][y];
   }
 

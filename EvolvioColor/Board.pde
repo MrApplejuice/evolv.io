@@ -2,6 +2,8 @@ import java.io.*;
 import java.util.List;
 import java.util.Iterator;
 
+public static final List<SoftBody> EMPTY_SOFT_BODY_LIST = new ArrayList<SoftBody>();
+
 /**
   More abstraction layers to /some/ interaction between Creatues and the board.
   
@@ -142,7 +144,7 @@ class Board implements AbstractBoardInterface {
   // Creature
   int creatureMinimum;
   
-  ArrayList[][] softBodiesInPositions;
+  private ArrayList[][] softBodiesInPositions;
 
   private WorkDistributor workDistributor;
   private List<Thread> workerThreads = new ArrayList<Thread>(); 
@@ -283,6 +285,17 @@ class Board implements AbstractBoardInterface {
     } else {
       return BACKGROUND_COLOR;
     }
+  }
+  
+  @Override
+  public synchronized List<SoftBody> getSoftBodiesAtPosition(Vector2D pos) {
+    final int tileX = (int) pos.getX();
+    final int tileY = (int) pos.getY();
+    
+    if (tileX >= 0 && tileX < boardWidth && tileY >= 0 && tileY < boardHeight) {
+      return softBodiesInPositions[tileX][tileY];
+    }
+    return EMPTY_SOFT_BODY_LIST;
   }
 
   public synchronized void stop() {

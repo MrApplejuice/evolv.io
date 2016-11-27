@@ -87,21 +87,21 @@ class SoftBody {
   }
 
   public int xBound(int x) {
-    return Math.min(Math.max(x, 0), board.boardWidth - 1);
+    return Math.min(Math.max(x, 0), board.getBoardWidth() - 1);
   }
 
   public int yBound(int y) {
-    return Math.min(Math.max(y, 0), board.boardHeight - 1);
+    return Math.min(Math.max(y, 0), board.getBoardHeight() - 1);
   }
 
   public double xBodyBound(double x) {
     double radius = getRadius();
-    return Math.min(Math.max(x, radius), board.boardWidth-radius);
+    return Math.min(Math.max(x, radius), board.getBoardWidth() - radius);
   }
 
   public double yBodyBound(double y) {
     double radius = getRadius();
-    return Math.min(Math.max(y, radius), board.boardHeight - radius);
+    return Math.min(Math.max(y, radius), board.getBoardHeight() - radius);
   }
 
   public void collide(double timeStep) {

@@ -1,3 +1,11 @@
+/**
+  Extra traits for an object that has a rotation. 
+ */
+static interface OrientedBody {
+  // Returns the rotation of the object in radians.
+  public double getRotation();
+};
+
 class SoftBody {
   double px;
   double py;

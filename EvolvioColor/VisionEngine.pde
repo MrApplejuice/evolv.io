@@ -33,6 +33,8 @@ static class VisionSystem {
     
     final Vector2D tmpV = linAlgPool.getVector2D();
     for (int k = 0; k < visionAngles.length; k++) {
+      potentialVisionOccluders.clear();
+      
       final double visionTotalAngle = rotation + visionAngles[k];
 
       visionRangePoints[k].set(visionDistances[k] * Math.cos(visionTotalAngle),

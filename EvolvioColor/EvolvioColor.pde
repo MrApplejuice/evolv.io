@@ -179,9 +179,10 @@ void draw() {
         }
       }
       if (evoBoard.userControl && evoBoard.selectedCreature != null) {
-        cameraX = (float)evoBoard.selectedCreature.px;
-        cameraY = (float)evoBoard.selectedCreature.py;
-        cameraR = -PI / 2.0 - (float)evoBoard.selectedCreature.rotation;
+        final Vector2D cameraPos = evoBoard.selectedCreature.getPosition();
+        cameraX = (float) cameraPos.getX();
+        cameraY = (float) cameraPos.getY();
+        cameraR = -PI / 2.0 - (float) evoBoard.selectedCreature.getRotation();
       } else {
         cameraR = 0;
       }
@@ -222,8 +223,9 @@ void mousePressed() {
       dragging = 1;
     } else {
       if (abs(mouseX - (windowHeight + 65)) <= 60 && abs(mouseY - 147) <= 60 && evoBoard.selectedCreature != null) {
-        cameraX = (float)evoBoard.selectedCreature.px;
-        cameraY = (float)evoBoard.selectedCreature.py;
+        final Vector2D cameraPos = evoBoard.selectedCreature.getPosition();
+        cameraX = (float) cameraPos.getX();
+        cameraY = (float) cameraPos.getY();
         zoom = 16;
       } else if (mouseY >= 95 && mouseY < 135 && evoBoard.selectedCreature == null) {
         if (mouseX >= windowHeight + 10 && mouseX < windowHeight + 230) {
@@ -316,8 +318,9 @@ void mousePressed() {
         int listIndex = (mouseY-150)/70;
         if (listIndex >= 0 && listIndex < evoBoard.LIST_SLOTS) {
           evoBoard.selectedCreature = evoBoard.list[listIndex];
-          cameraX = (float)evoBoard.selectedCreature.px;
-          cameraY = (float)evoBoard.selectedCreature.py;
+          final Vector2D cameraPos = evoBoard.selectedCreature.getPosition();
+          cameraX = (float) cameraPos.getX();
+          cameraY = (float) cameraPos.getY();
           zoom = 16;
         }
       }
@@ -348,12 +351,11 @@ void mouseReleased() {
         evoBoard.unselect();
         cameraR = 0;
         if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
-          for (int i = 0; i < evoBoard.softBodiesInPositions[x][y].size (); i++) {
-            SoftBody body = (SoftBody)evoBoard.softBodiesInPositions[x][y].get(i);
-            if (body.isCreature) {
-              float distance = dist(mX, mY, (float)body.px, (float)body.py);
-              if (distance <= body.getRadius()) {
-                evoBoard.selectedCreature = (Creature)body;
+          for (final SoftBody body : evoBoard.softBodiesInPositions[x][y]) { 
+            if (Creature.class.isInstance(body)) {
+              final Creature creature = Creature.class.cast(body);
+              if (creature.getPosition().distance(new Vector2D().set(mX, mY)) <= creature.getRadius()) {
+                evoBoard.selectedCreature = creature;
                 zoom = 16;
               }
             }

@@ -97,6 +97,11 @@ static class Vector2D {
     }
     return false;
   }
+  
+  @Override
+  public String toString() {
+    return "(X: " + nf((float) getX(), 0, 2) + ", Y: " + nf((float) getY(), 0, 2) + ")";
+  }
 }
 
 static class Matrix2D {

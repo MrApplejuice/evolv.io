@@ -8,60 +8,54 @@ static NameGenerator nameGenerator = null;
 }
 
 class Creature extends SoftBody implements OrientedBody {
-  private LinearAlgebraPool creatureLinAlgPool = new LinearAlgebraPool(); 
-  
-  public final static double BRIGHTNESS_THRESHOLD = 0.7;
+  public static final double BRIGHTNESS_THRESHOLD = 0.7;
   
   // Energy
-  double ACCELERATION_ENERGY = 0.18;
-  double ACCELERATION_BACK_ENERGY = 0.24;
-  double SWIM_ENERGY = 0.008;
-  double TURN_ENERGY = 0.05;
-  double EAT_ENERGY = 0.05;
-  double EAT_SPEED = 0.5; // 1 is instant, 0 is nonexistent, 0.001 is verrry slow.
-  double EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER = 2.0; // The bigger this number is, the less effiently creatures eat when they're moving.
-  double FIGHT_ENERGY = 0.06;
-  double INJURED_ENERGY = 0.25;
-  double METABOLISM_ENERGY = 0.004;
-  double AGE_FACTOR = 1; // 0 no ageing
-  double currentEnergy;
-  final int ENERGY_HISTORY_LENGTH = 6;
-  double[] previousEnergy = new double[ENERGY_HISTORY_LENGTH];
+  public static final double ACCELERATION_ENERGY = 0.18;
+  public static final double ACCELERATION_BACK_ENERGY = 0.24;
+  public static final double SWIM_ENERGY = 0.008;
+  public static final double TURN_ENERGY = 0.05;
+  public static final double EAT_ENERGY = 0.05;
+  public static final double EAT_SPEED = 0.5; // 1 is instant, 0 is nonexistent, 0.001 is verrry slow.
+  public static final double EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER = 2.0; // The bigger this number is, the less effiently creatures eat when they're moving.
+  public static final double FIGHT_ENERGY = 0.06;
+  public static final double INJURED_ENERGY = 0.25;
+  public static final double METABOLISM_ENERGY = 0.004;
+  public static final double AGE_FACTOR = 1; // 0 no ageing
+  public static final double SAFE_SIZE = 1.25;
+  public static final double MATURE_AGE = 0.01;
+  public static final double FOOD_SENSITIVITY = 0.3;
+  public static final double MAX_DETAILED_ZOOM = 3.5; // Maximum zoom to draw details at
+  public static final int ENERGY_HISTORY_LENGTH = 6;
+  public static final float CROSS_SIZE = 0.022;
+
+  private double currentEnergy;
+  private double[] previousEnergy = new double[ENERGY_HISTORY_LENGTH];
 
   // Family
-  String name;
-  String parents;
-  int gen;
-  
-  private int id;
+  private String name;
+  private String parents;
+  private int gen;
 
   // Vision or View or Preference
-  final double FOOD_SENSITIVITY = 0.3;
-  final double MAX_DETAILED_ZOOM = 3.5; // Maximum zoom to draw details at
+  private VisionSystem visionSystem = new VisionSystem(softBodyLinAlgPool);
+  private Brain brain;
 
-  private VisionSystem visionSystem = new VisionSystem(creatureLinAlgPool);
-  
-  Brain brain;
-
-  // Misc or Unsorted
-  float preferredRank = 8;
-  float CROSS_SIZE = 0.022;
-  double mouthHue;
-  double vr = 0;
-  double rotation = 0;
-  final double SAFE_SIZE = 1.25;
-  final double MATURE_AGE = 0.01;
+  private float preferredRank = 8;
+  private double mouthHue;
+  private double vr = 0;
+  private double rotation = 0;
 
   public double getRotation() {
     return rotation;
   }
 
-  public Creature(double tpx, double tpy, double tvx, double tvy, double tenergy, 
+  public Creature(int id, Vector2D pos, Vector2D vel, double tenergy, 
     double tdensity, double thue, double tsaturation, double tbrightness, Board tb, double bt, 
     double rot, double tvr, String tname, String tparents, boolean mutateName, 
     Brain brain, int tgen, double tmouthHue) {
 
-    super(tpx, tpy, tvx, tvy, tenergy, tdensity, thue, tsaturation, tbrightness, tb, bt);
+    super(id, pos, vel, tenergy, tdensity, thue, tsaturation, tbrightness, tb, bt);
 
     if (brain == null) {
       brain = new Brain(null, null);
@@ -70,7 +64,6 @@ class Creature extends SoftBody implements OrientedBody {
 
     rotation = rot;
     vr = tvr;
-    isCreature = true;
     if (tname.length() >= 1) {
       if (mutateName) {
         name = nameGenerator.mutateName(tname);
@@ -84,12 +77,6 @@ class Creature extends SoftBody implements OrientedBody {
     parents = tparents;
     gen = tgen;
     mouthHue = tmouthHue;
-    
-    id = board.generateUniqueId();
-  }
-
-  public int getId() {
-    return id;
   }
 
   /////////////////// DRAW FUNCTIONS /////////////////
@@ -98,38 +85,39 @@ class Creature extends SoftBody implements OrientedBody {
     brain.draw(font, scaleUp, mX, mY);
   }
 
-  public void drawSoftBody(float scaleUp, float camZoom, boolean showVision) {
+  @Override
+  public void drawSoftBody(DrawConfiguration drawConfig, boolean isSelected, float scaleUp, float camZoom, boolean showVision) {
     ellipseMode(RADIUS);
     double radius = getRadius();
     if (showVision && camZoom > MAX_DETAILED_ZOOM) {
-      drawVisionAngles(board, board, scaleUp);
+      drawVisionAngles(drawConfig, scaleUp);
     }
     noStroke();
     if (fightLevel > 0) {
       fill(0, 1, 1, (float)(fightLevel * 0.8));
-      ellipse((float)(px * scaleUp), (float)(py * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp));
+      ellipse((float)(position.getX() * scaleUp), (float)(position.getY() * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp));
     }
     strokeWeight(Board.CREATURE_STROKE_WEIGHT);
     stroke(0, 0, 1);
     fill(0, 0, 1);
-    if (this == board.selectedCreature) {
-      ellipse((float)(px * scaleUp), (float)(py * scaleUp), 
+    if (isSelected) {
+      ellipse((float)(position.getX() * scaleUp), (float)(position.getY() * scaleUp), 
         (float)(radius * scaleUp + 1 + 75.0 / camZoom), (float)(radius * scaleUp + 1 + 75.0 / camZoom));
     }
-    super.drawSoftBody(scaleUp);
+    super.drawSoftBody(drawConfig, isSelected, scaleUp, camZoom, showVision);
 
     if (camZoom > MAX_DETAILED_ZOOM) {
-      drawMouth(board, scaleUp, radius, rotation, camZoom, mouthHue);
+      drawMouth(scaleUp, radius, rotation, camZoom, mouthHue);
       if (showVision) {
         fill(0, 0, 1);
         textFont(font, 0.2 * scaleUp);
         textAlign(CENTER);
-        text(getCreatureName(), (float)(px * scaleUp), (float)((py - getRadius() * 1.4 - 0.07) * scaleUp));
+        text(getCreatureName(), (float)(position.getX() * scaleUp), (float)((position.getY() - getRadius() * 1.4 - 0.07) * scaleUp));
       }
     }
   }
 
-  public void drawVisionAngles(AbstractBoardInterface board, DrawConfiguration drawConfig, float scaleUp) {
+  public void drawVisionAngles(DrawConfiguration drawConfig, float scaleUp) {
     double[] visionValues = visionSystem.getValues();
     Vector2D[] visionEndpoints = visionSystem.getVisionEndpoints();
     Vector2D[] visionRangePoints = visionSystem.getVisionRangePoints();
@@ -140,7 +128,7 @@ class Creature extends SoftBody implements OrientedBody {
       }
       stroke(visionUIcolor);
       strokeWeight(drawConfig.getStrokeWeight());
-      line((float)(px * scaleUp), (float) (py * scaleUp), (float) (visionRangePoints[i].getX() * scaleUp), (float) (visionRangePoints[i].getY() * scaleUp));
+      line((float)(position.getX() * scaleUp), (float) (position.getY() * scaleUp), (float) (visionRangePoints[i].getX() * scaleUp), (float) (visionRangePoints[i].getY() * scaleUp));
       noStroke();
       fill(visionUIcolor);
       ellipse((float)(visionEndpoints[i].getX() * scaleUp), (float)(visionEndpoints[i].getY() * scaleUp), 2 * CROSS_SIZE * scaleUp, 2 * CROSS_SIZE * scaleUp);
@@ -150,15 +138,15 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
   
-  public void drawMouth(Board board, float scaleUp, double radius, double rotation, float camZoom, double mouthHue) {
+  public void drawMouth(float scaleUp, double radius, double rotation, float camZoom, double mouthHue) {
     noFill();
     strokeWeight(Board.CREATURE_STROKE_WEIGHT);
     stroke(0, 0, 1);
     ellipseMode(RADIUS);
-    ellipse((float)(px * scaleUp), (float)(py * scaleUp), 
+    ellipse((float)(position.getX() * scaleUp), (float)(position.getY() * scaleUp), 
       (float) (Board.MINIMUM_SURVIVABLE_SIZE * scaleUp), (float) (Board.MINIMUM_SURVIVABLE_SIZE * scaleUp));
     pushMatrix();
-    translate((float)(px * scaleUp), (float)(py * scaleUp));
+    translate((float)(position.getX() * scaleUp), (float)(position.getY() * scaleUp));
     scale((float)radius);
     rotate((float)rotation);
     strokeWeight((float)(Board.CREATURE_STROKE_WEIGHT / radius));
@@ -202,8 +190,11 @@ class Creature extends SoftBody implements OrientedBody {
 
   public void accelerate(double amount, double timeStep) {
     double multiplied = amount * timeStep / getMass();
-    vx += Math.cos(rotation) * multiplied;
-    vy += Math.sin(rotation) * multiplied;
+    
+    final Vector2D deltaV = softBodyLinAlgPool.getVector2D().set(Math.cos(rotation) * multiplied, Math.sin(rotation) * multiplied);
+    velocity.inplaceAdd(deltaV);
+    softBodyLinAlgPool.recycle(deltaV);
+    
     if (amount >= 0) {
       loseEnergy(amount * ACCELERATION_ENERGY * timeStep);
     } else {
@@ -217,7 +208,7 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void eat(final double attemptedAmount, final double timeStep) {
-    final double amount = attemptedAmount / (1.0 + distance(0, 0, vx, vy) * EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER); // The faster you're moving, the less efficiently you can eat.
+    final double amount = attemptedAmount / (1.0 + velocity.length() * EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER); // The faster you're moving, the less efficiently you can eat.
     if (amount < 0) {
       dropEnergy(-amount * timeStep);
       loseEnergy(-attemptedAmount * EAT_ENERGY * timeStep);
@@ -240,7 +231,7 @@ class Creature extends SoftBody implements OrientedBody {
         }
       });
       
-      creatureLinAlgPool.recycle(tileLocation);
+      softBodyLinAlgPool.recycle(tileLocation);
       
       double multiplier = 1.0 - foodDistance.value / FOOD_SENSITIVITY;
       if (multiplier >= 0) {
@@ -258,11 +249,12 @@ class Creature extends SoftBody implements OrientedBody {
       loseEnergy(fightLevel * FIGHT_ENERGY * energy * timeStep);
       for (int i = 0; i < colliders.size(); i++) {
         SoftBody collider = colliders.get(i);
-        if (collider.isCreature) {
-          float distance = dist((float)px, (float)py, (float)collider.px, (float)collider.py);
-          double combinedRadius = getRadius() * FIGHT_RANGE + collider.getRadius();
+        if (Creature.class.isInstance(collider)) {
+          final Creature colliderCreature = Creature.class.cast(collider);
+          final double distance = position.distance(colliderCreature.getPosition());
+          final double combinedRadius = getRadius() * FIGHT_RANGE + collider.getRadius();
           if (distance < combinedRadius) {
-            ((Creature)collider).dropEnergy(fightLevel * INJURED_ENERGY * timeStep);
+            colliderCreature.dropEnergy(fightLevel * INJURED_ENERGY * timeStep);
           }
         }
       }
@@ -289,35 +281,26 @@ class Creature extends SoftBody implements OrientedBody {
           tile.addFood(realEnergyLost, hue, true);
         }
       });
-      creatureLinAlgPool.recycle(tileLocation);
+      softBodyLinAlgPool.recycle(tileLocation);
     }
   }
 
   public void see(double timeStep) {
-    final Vector2D position = creatureLinAlgPool.getVector2D().set(px, py);
     visionSystem.updateVision(board, position, getRotation(), this);
-    creatureLinAlgPool.recycle(position);
   }
   
   private Vector2D getRandomCoveredTileLocation() {
     double radius = getRadius();
 
-    Vector2D choice = creatureLinAlgPool.getVector2D().set(0, 0);
-    Vector2D pos = creatureLinAlgPool.getVector2D().set(px, py);
+    Vector2D choice = softBodyLinAlgPool.getVector2D().set(0, 0);
     
-    while (choice.distance(pos) > radius) {
+    while (choice.distance(position) > radius) {
       choice.set(Math.random() * 2 * radius - radius,
                  Math.random() * 2 * radius - radius);
-      choice.inplaceAdd(pos);
+      choice.inplaceAdd(position);
     }
     
-    creatureLinAlgPool.recycle(pos);
-    
     return choice;
-  }
-
-  public double distance(double x1, double y1, double x2, double y2) {
-    return(Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)));
   }
 
   public void returnToEarth() {
@@ -330,15 +313,7 @@ class Creature extends SoftBody implements OrientedBody {
           tile.addFood(energy / pieces, hue, true);
         }
       });
-      creatureLinAlgPool.recycle(tileLocation);
-    }
-    for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
-      for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
-        board.softBodiesInPositions[x][y].remove(this);
-      }
-    }
-    if (board.selectedCreature == this) {
-      board.unselect();
+      softBodyLinAlgPool.recycle(tileLocation);
     }
   }
 
@@ -438,7 +413,7 @@ class Creature extends SoftBody implements OrientedBody {
         }
       }
     });
-    creatureLinAlgPool.recycle(tileLocation);
+    softBodyLinAlgPool.recycle(tileLocation);
     
     super.applyMotions(timeStep);
     rotation += vr;

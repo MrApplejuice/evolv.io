@@ -61,6 +61,7 @@ class Tile {
       text("Food: " + nf((float)(foodType), 0, 2), (posX + 0.5) * scaleUp, (posY + 0.9) * scaleUp);
     }
   }
+  
   public void iterate() {
     double updateTime = board.year;
     if (Math.abs(lastUpdateTime - updateTime) >= 0.00001) {
@@ -90,6 +91,7 @@ class Tile {
       lastUpdateTime = updateTime;
     }
   }
+  
   public void addFood(double amount, double addedFoodType, boolean canCauseIteration) {
     if (canCauseIteration) {
       iterate();
@@ -99,12 +101,14 @@ class Tile {
      foodType += (addedFoodType - foodType) * (amount / foodLevel); // We're adding new plant growth, so we gotta "mix" the colors of the tile.
      }*/
   }
+  
   public void removeFood(double amount, boolean canCauseIteration) {
     if (canCauseIteration) {
       iterate();
     }
     foodLevel -= amount;
   }
+  
   public color getColor() {
     iterate();
     color foodColor = color((float)(foodType), 1, 1);
@@ -116,13 +120,15 @@ class Tile {
       return interColorFixedHue(foodColor, blackColor, 1.0 - maxGrowthLevel / foodLevel, hue(foodColor));
     }
   }
-  public color interColor(color a, color b, double x) {
+  
+  private color interColor(color a, color b, double x) {
     double hue = inter(hue(a), hue(b), x);
     double sat = inter(saturation(a), saturation(b), x);
     double bri = inter(brightness(a), brightness(b), x); // I know it's dumb to do interpolation with HSL but oh well
     return color((float)(hue), (float)(sat), (float)(bri));
   }
-  public color interColorFixedHue(color a, color b, double x, double hue) {
+  
+  private color interColorFixedHue(color a, color b, double x, double hue) {
     double satB = saturation(b);
     if (brightness(b) == 0) { // I want black to be calculated as 100% saturation
       satB = 1;
@@ -131,7 +137,8 @@ class Tile {
     double bri = inter(brightness(a), brightness(b), x); // I know it's dumb to do interpolation with HSL but oh well
     return color((float)(hue), (float)(sat), (float)(bri));
   }
-  public double inter(double a, double b, double x) {
+  
+  private double inter(double a, double b, double x) {
     return a + (b - a) * x;
   }
 }

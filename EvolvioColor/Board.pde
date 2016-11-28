@@ -21,9 +21,6 @@ public interface AbstractBoardInterface {
   // Adds a new creature to the Board (reproduction)
   public void addCreature(Creature creature);
   
-  // Creates a fresh, unique id
-  public int generateUniqueId();
-
   public int getBoardWidth();
   public int getBoardHeight();
   
@@ -164,7 +161,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   // Creature
   int creatureMinimum;
   
-  private ArrayList[][] softBodiesInPositions;
+  private ArrayList<SoftBody>[][] softBodiesInPositions;
 
   private WorkDistributor workDistributor;
   private List<Thread> workerThreads = new ArrayList<Thread>(); 
@@ -255,7 +252,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     ROCKS_TO_ADD = rta;
     rocks = new ArrayList<SoftBody>(0);
     for (int i = 0; i < ROCKS_TO_ADD; i++) {
-      rocks.add(new SoftBody(random(0, boardWidth), random(0, boardHeight), 0, 0, 
+      rocks.add(new SoftBody(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
         getRandomSize(), ROCK_DENSITY, hue(ROCK_COLOR), saturation(ROCK_COLOR), brightness(ROCK_COLOR), this, year));
     }
 
@@ -358,11 +355,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         tiles[x][y].drawTile(scaleUp, (mX == x && mY == y));
       }
     }
-    for (int i = 0; i < rocks.size(); i++) {
-      rocks.get(i).drawSoftBody(scaleUp);
+    for (final SoftBody sb : rocks) {
+      sb.drawSoftBody(this, false, scaleUp, camZoom, true);
     }
-    for (int i = 0; i < creatures.size(); i++) {
-      creatures.get(i).drawSoftBody(scaleUp, camZoom, true);
+    for (final Creature c : creatures) {
+      c.drawSoftBody(this, c == selectedCreature, scaleUp, camZoom, true);
     }
   }
 
@@ -499,24 +496,26 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         rect(185, 280-h, 25, h);
       }
       fill(0, 0, 1);
-      text("Name: " + selectedCreature.getCreatureName(), 10, 225);
-      text("Energy: " + nf(100 * (float)selectedCreature.energy, 0, 2) + " yums", 10, 250);
-      text("E Change: " + nf(100 * energyUsage, 0, 2) + " yums/year", 10, 275);
+      
+      int linePos = 225;
+      text("Name: " + selectedCreature.getCreatureName(), 10, linePos); linePos += 25;
+      text("Energy: " + nf(100 * (float)selectedCreature.energy, 0, 2) + " yums", 10, linePos); linePos += 25;
+      text("E Change: " + nf(100 * energyUsage, 0, 2) + " yums/year", 10, linePos); linePos += 25;
 
-      text("ID: " + selectedCreature.id, 10, 325);
-      text("X: " + nf((float)selectedCreature.px, 0, 2), 10, 350);
-      text("Y: " + nf((float)selectedCreature.py, 0, 2), 10, 375);
-      text("Rotation: " + nf((float)selectedCreature.rotation, 0, 2), 10, 400);
-      text("B-day: " + toDate(selectedCreature.birthTime), 10, 425);
-      text("(" + toAge(selectedCreature.birthTime) + ")", 10, 450);
-      text("Generation: " + selectedCreature.gen, 10, 475);
-      text("Parents: " + selectedCreature.parents, 10, 500, 210, 255);
-      text("Hue: " + nf((float)(selectedCreature.hue), 0, 2), 10, 550, 210, 255);
-      text("Mouth hue: " + nf((float)(selectedCreature.mouthHue), 0, 2), 10, 575, 210, 255);
+      text("ID: " + selectedCreature.getId(), 10, linePos); linePos += 25;
+      text("Pos: " + selectedCreature.getPosition(), 10, linePos); linePos += 25;
+      text("Rotation: " + nf((float)selectedCreature.rotation, 0, 2), 10, linePos); linePos += 25;
+      text("B-day: " + toDate(selectedCreature.birthTime), 10, linePos); linePos += 25;
+      text("(" + toAge(selectedCreature.birthTime) + ")", 10, linePos); linePos += 25;
+      text("Generation: " + selectedCreature.gen, 10, linePos); linePos += 25;
+      text("Parents: " + selectedCreature.parents, 10, linePos, 210, 255); linePos += 25 * 2;
+      text("Hue: " + nf((float)(selectedCreature.hue), 0, 2), 10, linePos, 210, 255); linePos += 25;
+      text("Mouth hue: " + nf((float)(selectedCreature.mouthHue), 0, 2), 10, linePos, 210, 255); linePos += 25;
 
       if (userControl) {
+        linePos += 25;
         text("Controls:\nUp/Down: Move\nLeft/Right: Rotate\nSpace: Eat\nF: Fight\nV: Vomit\nU, J: Change color"+
-          "\nI, K: Change mouth color\nB: Give birth (Not possible if under " + Math.round((MANUAL_BIRTH_SIZE + 1) * 100) + " yums)", 10, 625, 250, 400);
+          "\nI, K: Change mouth color\nB: Give birth (Not possible if under " + Math.round((MANUAL_BIRTH_SIZE + 1) * 100) + " yums)", 10, linePos, 250, 400);
       }
       pushMatrix();
       translate(400, 80);
@@ -570,7 +569,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     return folder + "/" + modes[type] + "/" + nf(fileSaveCounts[type], 5) + ending;
   }
 
-  @Override
   public synchronized int generateUniqueId() {
     return uniqueIdCounter++;
   };
@@ -688,7 +686,18 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       while (creatureIterator.hasNext()) {
         final Creature me = creatureIterator.next();
         if (me.getRadius() < MINIMUM_SURVIVABLE_SIZE) {
+          if (selectedCreature == me) {
+            unselect();
+          }
+          
           me.returnToEarth();
+
+          for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
+            for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
+              board.softBodiesInPositions[x][y].remove(this);
+            }
+          }
+          
           creatureIterator.remove();
         }
       }
@@ -832,7 +841,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         c.addEnergy(c.SAFE_SIZE);
         c.reproduce(c.SAFE_SIZE, timeStep, year);
       } else {
-        creatures.add(new Creature(random(0, boardWidth), random(0, boardHeight), 0, 0, 
+        creatures.add(new Creature(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 
           this, year, random(0, 2 * PI), 0, "", "[PRIMORDIAL]", true, null, 1, random(0, 1)));
       }
@@ -852,9 +861,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private void drawCreature(Creature c, float x, float y, float scale, float scaleUp) {
     pushMatrix();
     float scaleIconUp = scaleUp * scale;
-    translate((float)(-c.px * scaleIconUp), (float)(-c.py * scaleIconUp));
+    final Vector2D creaturePos = c.getPosition();
+    translate((float)(-creaturePos.getX() * scaleIconUp), (float)(-creaturePos.getY() * scaleIconUp));
     translate(x, y);
-    c.drawSoftBody(scaleIconUp, 40.0 / scale, false);
+    c.drawSoftBody(this, c == selectedCreature, scaleIconUp, 40.0 / scale, false);
     popMatrix();
   }
 

@@ -7,18 +7,23 @@ static interface OrientedBody {
 };
 
 class SoftBody {
-  double px;
-  double py;
-  double vx;
-  double vy;
-  double energy;
+  protected LinearAlgebraPool softBodyLinAlgPool = new LinearAlgebraPool();
+  
+  private int id;
+  
+  protected AbstractBoardInterface board;
+
+  protected Vector2D position = new Vector2D();
+  protected Vector2D velocity = new Vector2D();
+  
+  protected double energy;
+  
   float ENERGY_DENSITY; // Set so when a creature is of minimum size, it equals one.
   double density;
   double hue;
   double saturation;
   double brightness;
   double birthTime;
-  boolean isCreature = false;
   final float FRICTION = 0.004;
   final float COLLISION_FORCE = 0.01;
   final float FIGHT_RANGE = 2.0;
@@ -33,26 +38,34 @@ class SoftBody {
   int SBIPMaxX;
   int SBIPMaxY;
   ArrayList<SoftBody> colliders;
-  Board board;
 
-  public SoftBody(double tpx, double tpy, double tvx, double tvy, double tenergy, double tdensity, 
-    double thue, double tsaturation, double tbrightness, Board tb, double bt) {
-    px = tpx;
-    py = tpy;
-    vx = tvx;
-    vy = tvy;
+  public SoftBody(int id, Vector2D pos, Vector2D vel, double tenergy, double tdensity, 
+    double thue, double tsaturation, double tbrightness, AbstractBoardInterface board, double bt) {
+    
+    this.id = id;
+    position.set(pos);
+    velocity.set(vel);
+    this.board = board;
+    
     energy = tenergy;
     density = tdensity;
     hue = thue;
     saturation = tsaturation;
     brightness = tbrightness;
-    board = tb;
     setSBIP(false);
     setSBIP(false); // Just to set previous SBIPs as well.
     birthTime = bt;
     ENERGY_DENSITY = 1.0 / (tb.MINIMUM_SURVIVABLE_SIZE * tb.MINIMUM_SURVIVABLE_SIZE * PI);
   }
 
+  public Vector2D getPosition() {
+    return position;
+  }
+
+  public int getId() {
+    return id;
+  }
+  
   public void setSBIP(boolean shouldRemove) {
     double radius = getRadius() * FIGHT_RANGE;
     prevSBIPMinX = SBIPMinX;
@@ -143,7 +156,7 @@ class SoftBody {
     setSBIP(true);
   }
 
-  public void drawSoftBody(float scaleUp) {
+  public void drawSoftBody(DrawConfiguration drawConfig, boolean isSelected, float scaleUp, float camZoom, boolean showVision) {
     double radius = getRadius();
     stroke(0);
     strokeWeight(board.CREATURE_STROKE_WEIGHT);

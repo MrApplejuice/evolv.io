@@ -4,6 +4,15 @@
   Especially linear algebra stuff!
  */
  
+ /**
+   Helper class for transporting values outside the scope of 
+   a local class defitinion.
+  */
+static class SettableDouble {
+  public double value = 0;
+};
+ 
+ 
 static class Vector2D {
   private double[] components = {0, 0};
   

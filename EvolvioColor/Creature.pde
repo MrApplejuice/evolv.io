@@ -152,16 +152,16 @@ class Creature extends SoftBody implements OrientedBody {
   
   public void drawMouth(Board board, float scaleUp, double radius, double rotation, float camZoom, double mouthHue) {
     noFill();
-    strokeWeight(board.CREATURE_STROKE_WEIGHT);
+    strokeWeight(Board.CREATURE_STROKE_WEIGHT);
     stroke(0, 0, 1);
     ellipseMode(RADIUS);
     ellipse((float)(px * scaleUp), (float)(py * scaleUp), 
-      (float)(board.MINIMUM_SURVIVABLE_SIZE * scaleUp), (float)(board.MINIMUM_SURVIVABLE_SIZE * scaleUp));
+      (float) (Board.MINIMUM_SURVIVABLE_SIZE * scaleUp), (float) (Board.MINIMUM_SURVIVABLE_SIZE * scaleUp));
     pushMatrix();
     translate((float)(px * scaleUp), (float)(py * scaleUp));
     scale((float)radius);
     rotate((float)rotation);
-    strokeWeight((float)(board.CREATURE_STROKE_WEIGHT / radius));
+    strokeWeight((float)(Board.CREATURE_STROKE_WEIGHT / radius));
     stroke(0, 0, 0);
     fill((float)mouthHue, 1.0, 1.0);
     ellipse(0.6 * scaleUp, 0, 0.37 * scaleUp, 0.37 * scaleUp);
@@ -216,24 +216,37 @@ class Creature extends SoftBody implements OrientedBody {
     loseEnergy(Math.abs(amount * TURN_ENERGY * energy * timeStep));
   }
 
-  public void eat(double attemptedAmount, double timeStep) {
-    double amount = attemptedAmount / (1.0 + distance(0, 0, vx, vy) * EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER); // The faster you're moving, the less efficiently you can eat.
+  public void eat(final double attemptedAmount, final double timeStep) {
+    final double amount = attemptedAmount / (1.0 + distance(0, 0, vx, vy) * EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER); // The faster you're moving, the less efficiently you can eat.
     if (amount < 0) {
       dropEnergy(-amount * timeStep);
       loseEnergy(-attemptedAmount * EAT_ENERGY * timeStep);
     } else {
-      Tile coveredTile = getRandomCoveredTile();
-      double foodToEat = coveredTile.foodLevel * (1 - Math.pow((1 - EAT_SPEED), amount * timeStep));
-      if (foodToEat > coveredTile.foodLevel) {
-        foodToEat = coveredTile.foodLevel;
-      }
-      coveredTile.removeFood(foodToEat, true);
-      double foodDistance = Math.abs(coveredTile.foodType - mouthHue);
-      double multiplier = 1.0 - foodDistance / FOOD_SENSITIVITY;
+      final Vector2D tileLocation = getRandomCoveredTileLocation();
+
+      final SettableDouble foodToEat = new SettableDouble();
+      final SettableDouble foodDistance = new SettableDouble();
+      board.interactWithTileAtLocation(tileLocation, new SynchronizedTileInteraction() {
+        @Override
+        public void handleTile(Tile tile) {
+          double _foodToEat = tile.foodLevel * (1 - Math.pow((1 - EAT_SPEED), amount * timeStep));
+          if (_foodToEat > tile.foodLevel) {
+            _foodToEat = tile.foodLevel;
+          }
+          tile.removeFood(_foodToEat, true);
+
+          foodToEat.value = _foodToEat;
+          foodDistance.value = Math.abs(tile.foodType - mouthHue);
+        }
+      });
+      
+      creatureLinAlgPool.recycle(tileLocation);
+      
+      double multiplier = 1.0 - foodDistance.value / FOOD_SENSITIVITY;
       if (multiplier >= 0) {
-        addEnergy(foodToEat * multiplier);
+        addEnergy(foodToEat.value * multiplier);
       } else {
-        loseEnergy(-foodToEat * multiplier);
+        loseEnergy(-foodToEat.value * multiplier);
       }
       loseEnergy(attemptedAmount * EAT_ENERGY * timeStep);
     }
@@ -266,9 +279,17 @@ class Creature extends SoftBody implements OrientedBody {
 
   public void dropEnergy(double energyLost) {
     if (energyLost > 0) {
-      energyLost = Math.min(energyLost, energy);
+      final double realEnergyLost = Math.min(energyLost, energy);
       energy -= energyLost;
-      getRandomCoveredTile().addFood(energyLost, hue, true);
+      
+      final Vector2D tileLocation = getRandomCoveredTileLocation();
+      board.interactWithTileAtLocation(tileLocation, new SynchronizedTileInteraction() {
+        @Override
+        public void handleTile(Tile tile) {
+          tile.addFood(realEnergyLost, hue, true);
+        }
+      });
+      creatureLinAlgPool.recycle(tileLocation);
     }
   }
 
@@ -278,7 +299,7 @@ class Creature extends SoftBody implements OrientedBody {
     creatureLinAlgPool.recycle(position);
   }
   
-  private Tile getRandomCoveredTile() {
+  private Vector2D getRandomCoveredTileLocation() {
     double radius = getRadius();
 
     Vector2D choice = creatureLinAlgPool.getVector2D().set(0, 0);
@@ -289,13 +310,10 @@ class Creature extends SoftBody implements OrientedBody {
                  Math.random() * 2 * radius - radius);
       choice.inplaceAdd(pos);
     }
-    int x = xBound((int) choice.getX());
-    int y = yBound((int) choice.getY());
     
-    creatureLinAlgPool.recycle(choice);
     creatureLinAlgPool.recycle(pos);
     
-    return board.tiles[x][y];
+    return choice;
   }
 
   public double distance(double x1, double y1, double x2, double y2) {
@@ -303,9 +321,16 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void returnToEarth() {
-    int pieces = 20;
+    final int pieces = 20;
     for (int i = 0; i < pieces; i++) {
-      getRandomCoveredTile().addFood(energy / pieces, hue, true);
+      final Vector2D tileLocation = getRandomCoveredTileLocation();
+      board.interactWithTileAtLocation(tileLocation, new SynchronizedTileInteraction() {
+        @Override
+        public void handleTile(Tile tile) {
+          tile.addFood(energy / pieces, hue, true);
+        }
+      });
+      creatureLinAlgPool.recycle(tileLocation);
     }
     for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
       for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
@@ -404,9 +429,17 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void applyMotions(double timeStep) {
-    if (getRandomCoveredTile().fertility > 1) {
-      loseEnergy(SWIM_ENERGY * energy);
-    }
+    final Vector2D tileLocation = getRandomCoveredTileLocation();
+    board.interactWithTileAtLocation(tileLocation, new SynchronizedTileInteraction() {
+      @Override
+      public void handleTile(Tile tile) {
+        if (tile.fertility > 1) {
+          loseEnergy(SWIM_ENERGY * energy);
+        }
+      }
+    });
+    creatureLinAlgPool.recycle(tileLocation);
+    
     super.applyMotions(timeStep);
     rotation += vr;
     vr *= Math.max(0, 1 - FRICTION / getMass());

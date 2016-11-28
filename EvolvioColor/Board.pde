@@ -5,6 +5,13 @@ import java.util.Iterator;
 public static final List<SoftBody> EMPTY_SOFT_BODY_LIST = new ArrayList<SoftBody>();
 
 /**
+  Handler interaface for synchrnozied handling of tile interactions.
+ */
+public interface SynchronizedTileInteraction {
+  public void handleTile(Tile tile);
+}
+
+/**
   More abstraction layers to /some/ interaction between Creatues and the board.
   
   This must be in a super-controlled manner however to make multithreading efficient 
@@ -34,6 +41,13 @@ public interface AbstractBoardInterface {
      Returns the a list of soft bodies at the given location.
    */
   public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos);
+  
+  /**
+    Starts a synchronized transation with a tile at the given location.
+    
+    Returns fals if the location was out of bounds!
+   */
+  public boolean interactWithTileAtLocation(Vector2D location, SynchronizedTileInteraction handler);
 };
 
 interface DrawConfiguration {
@@ -71,14 +85,14 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
      */
     public synchronized Creature popCreature() throws InterruptedException {
       if (cycleRunning) {
-        System.out.println("returning from: " + globalIndex + "  " + cycleStartSize);
+        //System.out.println("returning from: " + globalIndex + "  " + cycleStartSize);
         globalIndex++;
       }
       notifyAll();
       while ((!cycleRunning) || (dispatchIndex >= cycleStartSize)) {
         wait();
       }
-      System.out.println("serving: " + dispatchIndex + "  " + cycleStartSize);
+      //System.out.println("serving: " + dispatchIndex + "  " + cycleStartSize);
       return creatureList.get(dispatchIndex++);
     }
     
@@ -144,7 +158,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private int boardWidth;
   private int boardHeight;
   
-  Tile[][] tiles;
+  private Tile[][] tiles;
 
   // Creature
   int creatureMinimum;
@@ -287,7 +301,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
   
   @Override
-  public synchronized color getTileColor(Vector2D pos) {
+  public color getTileColor(Vector2D pos) {
     if (pos.getX() >= 0 && pos.getX() < boardWidth && pos.getY() >= 0 && pos.getY() < boardHeight) {
       return tiles[(int) pos.getX()][(int) pos.getY()].getColor();
     } else {
@@ -305,6 +319,23 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     }
     return EMPTY_SOFT_BODY_LIST;
   }
+  
+  @Override
+  public boolean interactWithTileAtLocation(Vector2D pos, SynchronizedTileInteraction handler) {
+    final int tileX = (int) pos.getX();
+    final int tileY = (int) pos.getY();
+    
+    if (tileX >= 0 && tileX < boardWidth && tileY >= 0 && tileY < boardHeight) {
+      final Tile tile = tiles[tileX][tileY];
+      synchronized (tile) {
+        handler.handleTile(tile);
+      }
+      return true;
+    } else {
+      return false;
+    }
+  }
+
 
   public synchronized void stop() {
     try {

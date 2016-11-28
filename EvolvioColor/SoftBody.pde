@@ -110,7 +110,7 @@ class SoftBody {
       for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
         for (int i = 0; i < board.softBodiesInPositions[x][y].size(); i++) {
           SoftBody newCollider = (SoftBody)board.softBodiesInPositions[x][y].get(i);
-          if (!colliders.contains(newCollider) && newCollider != this) {
+          if (!colliders.contains(newCollider) && (newCollider != this)) {
             colliders.add(newCollider);
           }
         }
@@ -118,6 +118,12 @@ class SoftBody {
     }
     for (int i = 0; i < colliders.size(); i++) {
       SoftBody collider = colliders.get(i);
+      
+      if (collider == null) {
+        System.out.println("-------------- Found collider == null!!!");
+        continue;
+      }
+      
       float distance = dist((float)px, (float)py, (float)collider.px, (float)collider.py);
       double combinedRadius = getRadius() + collider.getRadius();
       if (distance < combinedRadius) {

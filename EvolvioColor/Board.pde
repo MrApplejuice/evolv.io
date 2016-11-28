@@ -636,7 +636,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
-    iterationStartSW.lap();
+    //iterationStartSW.lap();
     
     iterationSimSW.start();
     if (userControl) {
@@ -671,10 +671,14 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           selectedCreature.useBrain(timeStep, !userControl, Board.this.year);
         }
       }
+      
+      for (final Creature creature : creatures) {
+        creature.see(timeStep);
+      }
     } else {
       workDistributor.cycle();
     }
-    iterationSimSW.lap();
+    //iterationSimSW.lap();
 
     iterationEndSW.start();
     synchronized (this) {
@@ -698,7 +702,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       notify();
     }
 
-    iterationEndSW.lap();
+    //iterationEndSW.lap();
   }
 
   public synchronized void finishIterate(double timeStep) {

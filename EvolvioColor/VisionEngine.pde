@@ -35,10 +35,16 @@ static class VisionSystem {
     for (int k = 0; k < visionAngles.length; k++) {
       final double visionTotalAngle = rotation + visionAngles[k];
 
-      visionEndpoints[k].set(visionDistances[k] * Math.cos(visionTotalAngle),
+      visionRangePoints[k].set(visionDistances[k] * Math.cos(visionTotalAngle),
                              visionDistances[k] * Math.sin(visionTotalAngle));
-      visionEndpoints[k].inplaceAdd(origin);
-      visionRangePoints[k].set(visionEndpoints[k]);
+      visionRangePoints[k].inplaceAdd(origin);
+
+      color c = board.getTileColor(visionEndpoints[k]);
+      // Cannot use the hue/saturation/brightness functions in a static class :-(
+      Color.RGBtoHSB((c >> 16) & 0xFF, (c >> 8) & 0xFF, (c >> 0) & 0xFF, hsbValues);
+      visionValues[k * 3] = hsbValues[0];
+      visionValues[k * 3 + 1] = hsbValues[1];
+      visionValues[k * 3 + 2] = hsbValues[2];
       
       // Iterative line propagation - perhaps use a default here like Bresenham's or Wu's line algorithm?
       Vector2D currentTile = null;
@@ -64,6 +70,8 @@ static class VisionSystem {
       
       final Matrix2D unrotateMatrix = linAlgPool.getMatrix2D().setRotationMatrix(-visionTotalAngle);
       final Vector2D visionEndTip = linAlgPool.getVector2D().set(visionDistances[k], 0);
+      
+      
       for (SoftBody body : potentialVisionOccluders) {
         if (body == ignore) {
           continue;
@@ -81,6 +89,10 @@ static class VisionSystem {
             visionEndTip.distance(rotatedPos) < radius) {  // Very crude check checking if the vision end point falls inside the collision sphere
             // YES! There is an occlussion.
             visionEndTip.set(rotatedPos.getX() - Math.sqrt(radius * radius - rotatedPos.getY() * rotatedPos.getY()), 0);
+
+            visionValues[k * 3] = body.hue;
+            visionValues[k * 3 + 1] = body.saturation;
+            visionValues[k * 3 + 2] = body.brightness;
           }
         }
 
@@ -91,15 +103,8 @@ static class VisionSystem {
       
       // Save vision end position and colors
       visionEndpoints[k].set(visionEndTip.getX() * Math.cos(visionTotalAngle),
-                            visionEndTip.getX() * Math.sin(visionTotalAngle));
+                             visionEndTip.getX() * Math.sin(visionTotalAngle));
       visionEndpoints[k].inplaceAdd(origin);
-      
-      color c = board.getTileColor(visionEndpoints[k]);
-      // Cannot use the hue/saturation/brightness functions in a static class :-(
-      Color.RGBtoHSB((c >> 16) & 0xFF, (c >> 8) & 0xFF, (c >> 0) & 0xFF, hsbValues);
-      visionValues[k * 3] = hsbValues[0];
-      visionValues[k * 3 + 1] = hsbValues[1];
-      visionValues[k * 3 + 2] = hsbValues[2];
       
       linAlgPool.recycle(visionEndTip);
       linAlgPool.recycle(unrotateMatrix);

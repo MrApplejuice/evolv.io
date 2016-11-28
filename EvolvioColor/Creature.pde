@@ -144,12 +144,9 @@ class Creature extends SoftBody implements OrientedBody {
       noStroke();
       fill(visionUIcolor);
       ellipse((float)(visionEndpoints[i].getX() * scaleUp), (float)(visionEndpoints[i].getY() * scaleUp), 2 * CROSS_SIZE * scaleUp, 2 * CROSS_SIZE * scaleUp);
-      stroke((float) (visionValues[i * 3]), (float) (visionValues[i * 3 + 1]), (float) (visionValues[i * 3 + 2]));
-      strokeWeight(drawConfig.getStrokeWeight());
-      line((float)((visionEndpoints[i].getX() - CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() - CROSS_SIZE) * scaleUp), 
-        (float)((visionEndpoints[i].getX() + CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() + CROSS_SIZE) * scaleUp));
-      line((float)((visionEndpoints[i].getX() - CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() + CROSS_SIZE) * scaleUp), 
-        (float)((visionEndpoints[i].getX() + CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() - CROSS_SIZE) * scaleUp));
+
+      fill((float) (visionValues[i * 3]), (float) (visionValues[i * 3 + 1]), (float) (visionValues[i * 3 + 2]));
+      ellipse((float)(visionEndpoints[i].getX() * scaleUp), (float)(visionEndpoints[i].getY() * scaleUp), CROSS_SIZE * scaleUp, CROSS_SIZE * scaleUp);
     }
   }
   

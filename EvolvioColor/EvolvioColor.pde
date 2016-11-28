@@ -86,7 +86,7 @@ class SimThread extends Thread {
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    syncWaitDuration.lap();
+    //syncWaitDuration.lap();
   }
   
   public synchronized void startNextCycle() {
@@ -104,7 +104,7 @@ class SimThread extends Thread {
         evoBoard.iterate(TIME_STEP);
         freeRunCounter -= 1;
       }
-      simulationDuration.lap();
+      //simulationDuration.lap();
       
       synchronized(this) {
         this.notifyAll();

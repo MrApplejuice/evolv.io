@@ -580,9 +580,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
 
   private boolean isIterating = false;
-  private StopWatch iterationStopWatch = new StopWatch("iteration");
+  private StopWatch iterationStartSW = new StopWatch("iteration start");
+  private StopWatch iterationSimSW = new StopWatch("iteration simulation");
+  private StopWatch iterationEndSW = new StopWatch("iteration end");
   public void iterate(double timeStep) {
-    iterationStopWatch.start();
+    iterationStartSW.start();
     
     synchronized (this) {
       try {
@@ -630,7 +632,9 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
+    //iterationStartSW.lap();
     
+    iterationSimSW.start();
     if (userControl) {
       if (selectedCreature != null) {
         if (keyPressed) {
@@ -666,7 +670,9 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     } else {
       workDistributor.cycle();
     }
+    //iterationSimSW.lap();
 
+    iterationEndSW.start();
     synchronized (this) {
       final Iterator<Creature> creatureIterator = creatures.iterator(); 
       while (creatureIterator.hasNext()) {
@@ -682,7 +688,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       notify();
     }
 
-    //iterationStopWatch.lap();
+    iterationEndSW.lap();
   }
 
   public synchronized void finishIterate(double timeStep) {
@@ -693,12 +699,14 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
       creature.see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
+    
+    /*
     if (Math.floor(fileSaveTimes[1] / imageSaveInterval) != Math.floor(year / imageSaveInterval)) {
       prepareForFileSave(1);
     }
     if (Math.floor(fileSaveTimes[3] / textSaveInterval) != Math.floor(year / textSaveInterval)) {
       prepareForFileSave(3);
-    }
+    }*/
   }
 
   private double getGrowthRate(double theTime) {

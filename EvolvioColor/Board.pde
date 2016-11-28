@@ -36,6 +36,10 @@ public interface AbstractBoardInterface {
   public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos);
 };
 
+interface DrawConfiguration {
+  public float getStrokeWeight();
+};
+
 /**
   This class exposes variables to EVERYTHING. Efficient parallelization
   of execution is not possible while other classes are so tightly coupled 
@@ -45,7 +49,7 @@ public interface AbstractBoardInterface {
   
   In the future the UI elements should als obe stripped from this class...
  */
-class Board implements AbstractBoardInterface {
+class Board implements AbstractBoardInterface, DrawConfiguration {
   /**
     Class distributing the simulation of creatures among different
     worker threads.
@@ -137,8 +141,9 @@ class Board implements AbstractBoardInterface {
   public static final int WORKER_THREAD_COUNT = 4;
   
   // Board
-  int boardWidth;
-  int boardHeight;
+  private int boardWidth;
+  private int boardHeight;
+  
   Tile[][] tiles;
 
   // Creature
@@ -202,7 +207,10 @@ class Board implements AbstractBoardInterface {
 
   final String[] sorts = {"Biggest", "Smallest", "Youngest", "Oldest", "A to Z", "Z to A", "Highest Gen", "Lowest Gen"};
 
-
+  @Override
+  public float getStrokeWeight() {
+    return CREATURE_STROKE_WEIGHT;
+  }
 
   public Board(int w, int h, float stepSize, float min, float max, int rta, int cm, int SEED, String INITIAL_FILE_NAME, double ts) {
     noiseSeed(SEED);

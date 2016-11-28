@@ -10,6 +10,8 @@ static NameGenerator nameGenerator = null;
 class Creature extends SoftBody implements OrientedBody {
   private LinearAlgebraPool creatureLinAlgPool = new LinearAlgebraPool(); 
   
+  public final static double BRIGHTNESS_THRESHOLD = 0.7;
+  
   // Energy
   double ACCELERATION_ENERGY = 0.18;
   double ACCELERATION_BACK_ENERGY = 0.24;
@@ -40,7 +42,6 @@ class Creature extends SoftBody implements OrientedBody {
   private VisionSystem visionSystem = new VisionSystem(creatureLinAlgPool);
   
   Brain brain;
-  final float BRIGHTNESS_THRESHOLD = 0.7;
 
   // Misc or Unsorted
   float preferredRank = 8;
@@ -101,14 +102,14 @@ class Creature extends SoftBody implements OrientedBody {
     ellipseMode(RADIUS);
     double radius = getRadius();
     if (showVision && camZoom > MAX_DETAILED_ZOOM) {
-      drawVisionAngles(board, scaleUp);
+      drawVisionAngles(board, board, scaleUp);
     }
     noStroke();
     if (fightLevel > 0) {
       fill(0, 1, 1, (float)(fightLevel * 0.8));
       ellipse((float)(px * scaleUp), (float)(py * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp), (float)(FIGHT_RANGE * radius * scaleUp));
     }
-    strokeWeight(board.CREATURE_STROKE_WEIGHT);
+    strokeWeight(Board.CREATURE_STROKE_WEIGHT);
     stroke(0, 0, 1);
     fill(0, 0, 1);
     if (this == board.selectedCreature) {
@@ -128,29 +129,30 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
 
-  public void drawVisionAngles(Board board, float scaleUp) {
-    /*for (int i = 0; i < visionAngles.length; i++) {
+  public void drawVisionAngles(AbstractBoardInterface board, DrawConfiguration drawConfig, float scaleUp) {
+    double[] visionValues = visionSystem.getValues();
+    Vector2D[] visionEndpoints = visionSystem.getVisionEndpoints();
+    Vector2D[] visionRangePoints = visionSystem.getVisionRangePoints();
+    for (int i = 0; i < visionRangePoints.length; i++) {
       color visionUIcolor = color(0, 0, 1);
-      if (visionResults[i * 3 + 2] > BRIGHTNESS_THRESHOLD) {
+      if (visionValues[i * 3 + 2] > BRIGHTNESS_THRESHOLD) {
         visionUIcolor = color(0, 0, 0);
       }
       stroke(visionUIcolor);
-      strokeWeight(board.CREATURE_STROKE_WEIGHT);
-      float endX = (float) getVisionEndX(i);
-      float endY = (float) getVisionEndY(i);
-      line((float)(px * scaleUp), (float)(py * scaleUp), endX * scaleUp, endY * scaleUp);
+      strokeWeight(drawConfig.getStrokeWeight());
+      line((float)(px * scaleUp), (float) (py * scaleUp), (float) (visionRangePoints[i].getX() * scaleUp), (float) (visionRangePoints[i].getY() * scaleUp));
       noStroke();
       fill(visionUIcolor);
-      ellipse((float)(visionOccludedX[i] * scaleUp), (float)(visionOccludedY[i] * scaleUp), 2 * CROSS_SIZE * scaleUp, 2 * CROSS_SIZE * scaleUp);
-      stroke((float)(visionResults[i * 3]), (float)(visionResults[i * 3 + 1]), (float)(visionResults[i * 3 + 2]));
-      strokeWeight(board.CREATURE_STROKE_WEIGHT);
-      line((float)((visionOccludedX[i] - CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] - CROSS_SIZE) * scaleUp), 
-        (float)((visionOccludedX[i] + CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] + CROSS_SIZE) * scaleUp));
-      line((float)((visionOccludedX[i] - CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] + CROSS_SIZE) * scaleUp), 
-        (float)((visionOccludedX[i] + CROSS_SIZE) * scaleUp), (float)((visionOccludedY[i] - CROSS_SIZE) * scaleUp));
-    }*/
+      ellipse((float)(visionEndpoints[i].getX() * scaleUp), (float)(visionEndpoints[i].getY() * scaleUp), 2 * CROSS_SIZE * scaleUp, 2 * CROSS_SIZE * scaleUp);
+      stroke((float) (visionValues[i * 3]), (float) (visionValues[i * 3 + 1]), (float) (visionValues[i * 3 + 2]));
+      strokeWeight(drawConfig.getStrokeWeight());
+      line((float)((visionEndpoints[i].getX() - CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() - CROSS_SIZE) * scaleUp), 
+        (float)((visionEndpoints[i].getX() + CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() + CROSS_SIZE) * scaleUp));
+      line((float)((visionEndpoints[i].getX() - CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() + CROSS_SIZE) * scaleUp), 
+        (float)((visionEndpoints[i].getX() + CROSS_SIZE) * scaleUp), (float)((visionEndpoints[i].getY() - CROSS_SIZE) * scaleUp));
+    }
   }
-
+  
   public void drawMouth(Board board, float scaleUp, double radius, double rotation, float camZoom, double mouthHue) {
     noFill();
     strokeWeight(board.CREATURE_STROKE_WEIGHT);
@@ -274,6 +276,9 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void see(double timeStep) {
+    final Vector2D position = creatureLinAlgPool.getVector2D().set(px, py);
+    visionSystem.updateVision(board, position, getRotation(), this);
+    creatureLinAlgPool.recycle(position);
   }
   
   private Tile getRandomCoveredTile() {

@@ -4,14 +4,15 @@ import java.awt.Color;
   Implements 2D vision system of a creature.  
  */
 static class VisionSystem {
-  public final double MAX_VISION_DISTANCE = 10;
-  
+  public final static double MAX_VISION_DISTANCE = 10;
+
   private LinearAlgebraPool linAlgPool;
   
   private double[] visionAngles = {0, -0.4, 0.4};
   private double[] visionDistances = {0, 0.7, 0.7};
   
-  private Vector2D[] visionOccluded = new Vector2D[visionAngles.length];
+  private Vector2D[] visionEndpoints = new Vector2D[visionAngles.length];
+  private Vector2D[] visionRangePoints = new Vector2D[visionAngles.length];
   
   private ArrayList<SoftBody> potentialVisionOccluders = new ArrayList<SoftBody>();
   
@@ -21,8 +22,9 @@ static class VisionSystem {
   public VisionSystem(LinearAlgebraPool linAlgPool) {
     this.linAlgPool = linAlgPool;
     
-    for (int i = 0; i < visionOccluded.length; i++) {
-      visionOccluded[i] = new Vector2D(); // Unpooled, these are static anyway! 
+    for (int i = 0; i < visionEndpoints.length; i++) {
+      visionEndpoints[i] = new Vector2D(); // Unpooled, these are static anyway! 
+      visionRangePoints[i] = new Vector2D(); // Unpooled, these are static anyway! 
     }
   }
   
@@ -33,9 +35,10 @@ static class VisionSystem {
     for (int k = 0; k < visionAngles.length; k++) {
       final double visionTotalAngle = rotation + visionAngles[k];
 
-      visionOccluded[k].set(visionDistances[k] * Math.cos(visionTotalAngle),
-                            visionDistances[k] * Math.sin(visionTotalAngle));
-      visionOccluded[k].inplaceAdd(origin);
+      visionEndpoints[k].set(visionDistances[k] * Math.cos(visionTotalAngle),
+                             visionDistances[k] * Math.sin(visionTotalAngle));
+      visionEndpoints[k].inplaceAdd(origin);
+      visionRangePoints[k].set(visionEndpoints[k]);
       
       // Iterative line propagation - perhaps use a default here like Bresenham's or Wu's line algorithm?
       Vector2D currentTile = null;
@@ -87,11 +90,11 @@ static class VisionSystem {
       }
       
       // Save vision end position and colors
-      visionOccluded[k].set(visionEndTip.getX() * Math.cos(visionTotalAngle),
-                            visionEndTip.getY() * Math.sin(visionTotalAngle));
-      visionOccluded[k].inplaceAdd(origin);
+      visionEndpoints[k].set(visionEndTip.getX() * Math.cos(visionTotalAngle),
+                            visionEndTip.getX() * Math.sin(visionTotalAngle));
+      visionEndpoints[k].inplaceAdd(origin);
       
-      color c = board.getTileColor(visionOccluded[k]);
+      color c = board.getTileColor(visionEndpoints[k]);
       // Cannot use the hue/saturation/brightness functions in a static class :-(
       Color.RGBtoHSB((c >> 16) & 0xFF, (c >> 8) & 0xFF, (c >> 0) & 0xFF, hsbValues);
       visionValues[k * 3] = hsbValues[0];
@@ -103,6 +106,14 @@ static class VisionSystem {
     }
     
     linAlgPool.recycle(tmpV);
+  }
+
+  public Vector2D[] getVisionEndpoints() {
+    return visionEndpoints;
+  }
+
+  public Vector2D[] getVisionRangePoints() {
+    return visionRangePoints;
   }
 
   public double[] getValues() {

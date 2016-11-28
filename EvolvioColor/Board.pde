@@ -136,6 +136,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         try {
           final Creature me = workDistributor.popCreature();
           me.collide(timeStep);
+          me.see(timeStep);
           me.metabolize(timeStep, year);
           me.useBrain(timeStep, !userControl, Board.this.year);
         }
@@ -583,6 +584,9 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private StopWatch iterationStartSW = new StopWatch("iteration start");
   private StopWatch iterationSimSW = new StopWatch("iteration simulation");
   private StopWatch iterationEndSW = new StopWatch("iteration end");
+  
+  private StopWatch iterationEndRemoveLoopSW = new StopWatch("iteration end remove loop");
+  private StopWatch iterationEndFinishSW = new StopWatch("iteration end finish func");
   public void iterate(double timeStep) {
     iterationStartSW.start();
     
@@ -632,7 +636,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
-    //iterationStartSW.lap();
+    iterationStartSW.lap();
     
     iterationSimSW.start();
     if (userControl) {
@@ -670,10 +674,12 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     } else {
       workDistributor.cycle();
     }
-    //iterationSimSW.lap();
+    iterationSimSW.lap();
 
     iterationEndSW.start();
     synchronized (this) {
+      iterationEndRemoveLoopSW.start();
+      
       final Iterator<Creature> creatureIterator = creatures.iterator(); 
       while (creatureIterator.hasNext()) {
         final Creature me = creatureIterator.next();
@@ -682,7 +688,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           creatureIterator.remove();
         }
       }
+      //iterationEndRemoveLoopSW.lap();
+
+      iterationEndFinishSW.start();
       finishIterate(timeStep);
+      //iterationEndFinishSW.lap();
       
       isIterating = false;
       notify();
@@ -697,7 +707,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     }
     for (final Creature creature : creatures) {
       creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-      creature.see(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
     
     /*

@@ -580,7 +580,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
 
   private boolean isIterating = false;
+  private StopWatch iterationStopWatch = new StopWatch("iteration");
   public void iterate(double timeStep) {
+    iterationStopWatch.start();
+    
     synchronized (this) {
       try {
         while (isIterating) {
@@ -678,6 +681,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       isIterating = false;
       notify();
     }
+
+    //iterationStopWatch.lap();
   }
 
   public synchronized void finishIterate(double timeStep) {

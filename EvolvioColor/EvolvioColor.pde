@@ -73,28 +73,38 @@ class SimThread extends Thread {
      Waits for a simulation cycle to end and then returns
      control to the main program.
    */
+  private StopWatch syncWaitDuration = new StopWatch("Sync duration");
   public synchronized void sync() {
+    syncWaitDuration.start();
     try {
-      if (!threadIsLockedUp) { // No notifications if it already is locked up!
-        while (freeRunCounter > 0) {
+      if (freeRunCounter >= 0) {
+        while ((freeRunCounter > 0) && (!threadIsLockedUp)) {
           wait();
         }
-      }
-      if (threadIsLockedUp) {
-        notifyAll();
       }
     }
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    syncWaitDuration.lap();
   }
   
+  public synchronized void startNextCycle() {
+    sync();
+    if (threadIsLockedUp) {
+      notifyAll();
+    }
+  }
+  
+  private StopWatch simulationDuration = new StopWatch("Sim duration");
   public void run() {
     while (!Thread.interrupted()) {
+      simulationDuration.start();
       if (freeRunCounter > 0) {
         evoBoard.iterate(TIME_STEP);
         freeRunCounter -= 1;
       }
+      simulationDuration.lap();
       
       synchronized(this) {
         this.notifyAll();
@@ -192,6 +202,8 @@ void draw() {
       prevMouseX = mouseX;
       prevMouseY = mouseY;
     }
+    
+    simThread.startNextCycle();
   }
 }
 

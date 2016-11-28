@@ -1,4 +1,6 @@
 import java.io.*;
+import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Iterator;
 
@@ -144,6 +146,93 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     }
   };
 
+  private class SoftBodyLookupField {
+    private class SoftBodyPositionAndExtents {
+      public SoftBody body;
+
+      // Statically stored data
+      public Vector2D center = new Vector2D();
+      public double radius;
+      public int gridMinX, gridMaxX, gridMinY, gridMaxY;
+      
+      public void update() {
+        center.set(body.getPosition());
+        radius = body.getRadius();
+        
+        gridMinX = Math.max(0, (int) (center.getX() - radius));
+        gridMaxX = Math.max(width - 1, (int) (center.getX() + radius));
+        gridMinY = Math.max(0, (int) (center.getY() - radius));
+        gridMaxY = Math.max(height - 1, (int) (center.getY() + radius));
+      }
+      
+      public SoftBodyPositionAndExtents(SoftBody b) {
+        body = b;
+        update();
+      }
+    };
+    
+    private int width, height;
+    
+    private Map<Integer, SoftBodyPositionAndExtents> softBodyPositionLookup = new HashMap<Integer, SoftBodyPositionAndExtents>();
+    private List<List<List<SoftBody>>> softBodyField; // Woohoo - list-ception because of limits to Java's generics!
+    
+    public SoftBodyLookupField(int width, int height) {
+      this.width = width;
+      this.height = height;
+      
+      softBodyField = new ArrayList<List<List<SoftBody>>>(width);
+      for (int x = 0; x < width; x++) {
+        final List<List<SoftBody>> column = new ArrayList<List<SoftBody>>(height);
+        softBodyField.add(column);
+        
+        for (int y = 0; y < height; y++) {
+          column.add(new ArrayList<SoftBody>());
+        }
+      }
+    }
+    
+    private void removeFromField(SoftBodyPositionAndExtents sbExt) {
+      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+          softBodyField.get(x).get(y).remove(sbExt.body);
+        }
+      }
+    }
+    
+    public void addOrUpdateBody(SoftBody b) {
+      SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.get(b.getId());
+      if (sbExt == null) {
+        sbExt = new SoftBodyPositionAndExtents(b);
+      } else {
+        removeFromField(sbExt);
+        sbExt.update();
+      }
+      
+      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+          softBodyField.get(x).get(y).add(b);
+        }
+      }
+    }
+    
+    public void remove(SoftBody b) {
+      SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.remove(b.getId());
+      if (sbExt != null) {
+        removeFromField(sbExt);
+      }
+    }
+    
+    public List<SoftBody> getBodiesAt(Vector2D pos) {
+      final int x = (int) pos.getX();
+      final int y = (int) pos.getY();
+      
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        return softBodyField.get(x).get(y);
+      }
+      return EMPTY_SOFT_BODY_LIST;
+    }
+  };
+  
   
   public static final float MIN_CREATURE_ENERGY = 1.2;
   public static final float MAX_CREATURE_ENERGY = 2.0;
@@ -157,11 +246,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private int boardHeight;
   
   private Tile[][] tiles;
+  private SoftBodyLookupField softBodyLookupField;
 
   // Creature
   int creatureMinimum;
   
-  private ArrayList<SoftBody>[][] softBodiesInPositions;
 
   private WorkDistributor workDistributor;
   private List<Thread> workerThreads = new ArrayList<Thread>(); 
@@ -172,10 +261,12 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private int uniqueIdCounter = 0;
   
   
-  Creature selectedCreature = null;
+  private Creature selectedCreature = null;
+  
   private int creatureRankMetric = 0;
   final int LIST_SLOTS = 6;
-  Creature[] list = new Creature[LIST_SLOTS];
+  private Creature[] list = new Creature[LIST_SLOTS];
+  
   final int creatureMinimumIncrement = 5;
   double MANUAL_BIRTH_SIZE = 1.2;
   boolean wasPressingB = false;
@@ -242,12 +333,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     MIN_TEMPERATURE = min;
     MAX_TEMPERATURE = max;
 
-    softBodiesInPositions = new ArrayList[boardWidth][boardHeight];
-    for (int x = 0; x < boardWidth; x++) {
-      for (int y = 0; y < boardHeight; y++) {
-        softBodiesInPositions[x][y] = new ArrayList<SoftBody>(0);
-      }
-    }
+    softBodyLookupField = new SoftBodyLookupField(boardWidth, boardHeight);
 
     ROCKS_TO_ADD = rta;
     rocks = new ArrayList<SoftBody>(0);
@@ -308,14 +394,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
   
   @Override
-  public synchronized List<SoftBody> getSoftBodiesAtPosition(Vector2D pos) {
-    final int tileX = (int) pos.getX();
-    final int tileY = (int) pos.getY();
-    
-    if (tileX >= 0 && tileX < boardWidth && tileY >= 0 && tileY < boardHeight) {
-      return softBodiesInPositions[tileX][tileY];
-    }
-    return EMPTY_SOFT_BODY_LIST;
+  public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos) {
+    return softBodyLookupField.getBodiesAt(pos);
   }
   
   @Override
@@ -333,7 +413,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       return false;
     }
   }
-
 
   public synchronized void stop() {
     try {
@@ -691,13 +770,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           }
           
           me.returnToEarth();
-
-          for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
-            for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
-              board.softBodiesInPositions[x][y].remove(this);
-            }
-          }
-          
+          softBodyLookupField.remove(me);
           creatureIterator.remove();
         }
       }

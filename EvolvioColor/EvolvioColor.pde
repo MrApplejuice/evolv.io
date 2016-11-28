@@ -344,20 +344,15 @@ void mouseReleased() {
     synchronized (evoBoard) {
       if (mouseX < windowHeight) { // DO NOT LOOK AT THIS CODE EITHER it is bad
         dragging = 1;
-        float mX = toWorldXCoordinate(mouseX, mouseY);
-        float mY = toWorldYCoordinate(mouseX, mouseY);
-        int x = (int)(floor(mX));
-        int y = (int)(floor(mY));
+        final Vector2D worldClickCoordinate = new Vector2D().set(toWorldXCoordinate(mouseX, mouseY), toWorldYCoordinate(mouseX, mouseY));
         evoBoard.unselect();
         cameraR = 0;
-        if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
-          for (final SoftBody body : evoBoard.softBodiesInPositions[x][y]) { 
-            if (Creature.class.isInstance(body)) {
-              final Creature creature = Creature.class.cast(body);
-              if (creature.getPosition().distance(new Vector2D().set(mX, mY)) <= creature.getRadius()) {
-                evoBoard.selectedCreature = creature;
-                zoom = 16;
-              }
+        for (final SoftBody body : evoBoard.getSoftBodiesAtPosition(worldClickCoordinate)) { 
+          if (Creature.class.isInstance(body)) {
+            final Creature creature = Creature.class.cast(body);
+            if (creature.getPosition().distance(new Vector2D().set(mX, mY)) <= creature.getRadius()) {
+              evoBoard.selectedCreature = creature;
+              zoom = 16;
             }
           }
         }

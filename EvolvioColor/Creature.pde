@@ -326,14 +326,16 @@ class Creature extends SoftBody implements OrientedBody {
       ArrayList<Creature> parents = new ArrayList<Creature>(0);
       parents.add(this);
       double availableEnergy = getBabyEnergy();
-      for (int i = 0; i < colliders.size(); i++) {
-        SoftBody possibleParent = colliders.get(i);
-        if (possibleParent.isCreature && ((Creature)possibleParent).brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
-          float distance = dist((float)px, (float)py, (float)possibleParent.px, (float)possibleParent.py);
-          double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
-          if (distance < combinedRadius) {
-            parents.add((Creature)possibleParent);
-            availableEnergy += ((Creature)possibleParent).getBabyEnergy();
+      for (final SoftBody possibleParentBody : colliders) {
+        if (Creature.class.isInstance(possibleParentBody)) {
+          final Creature possibleParent = Creature.class.cast(possibleParentBody);
+          if ((possibleParent).brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
+            final double distance = position.distance(possibleParent.getPosition());
+            double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
+            if (distance < combinedRadius) {
+              parents.add((Creature)possibleParent);
+              availableEnergy += ((Creature)possibleParent).getBabyEnergy();
+            }
           }
         }
       }

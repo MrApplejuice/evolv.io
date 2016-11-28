@@ -623,6 +623,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
               wasPressingB = false;
             }
           }
+          
+          selectedCreature.collide(timeStep);
+          selectedCreature.metabolize(timeStep, year);
+          selectedCreature.useBrain(timeStep, !userControl, Board.this.year);
         }
       }
     } else {

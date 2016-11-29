@@ -48,7 +48,7 @@ class Creature extends SoftBody implements OrientedBody {
   private double vr = 0;
   private double rotation = 0;
 
-  private boolean electedToReproduce = false;
+  private double plannedReproductionValue = 0;
   private double plannedFightValue = 0;
 
   public double getRotation() {
@@ -174,8 +174,6 @@ class Creature extends SoftBody implements OrientedBody {
     inputs[10] = mouthHue;
     brain.input(inputs);
     
-    electedToReproduce = false;
-
     if (useOutput) {
       double[] output = brain.outputs();
       hue = Math.abs(output[0]) % 1.0;
@@ -184,23 +182,24 @@ class Creature extends SoftBody implements OrientedBody {
       eat(output[3], timeStep);
       fight(output[4]);
       if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
-        reproduce();
+        reproduce(SAFE_SIZE);
       }
       mouthHue = Math.abs(output[10]) % 1.0;
     }
   }
 
-  public void reproduce() {
-    electedToReproduce = true;
+  public void reproduce(double size) {
+    plannedReproductionValue = size;
   }
 
   @Override
   public void collide(double timeStep, List<SoftBody> colliders) {
     super.collide(timeStep, colliders);
-    if (electedToReproduce) {
-      doReproduce(colliders, SAFE_SIZE);
+    if (plannedReproductionValue > 0) {
+      doReproduce(colliders, plannedReproductionValue);
     }
     doFight(colliders, plannedFightValue, timeStep);
+    plannedFightValue = 0;
   }
   
   public void metabolize(double timeStep, double currentYear) {
@@ -401,6 +400,8 @@ class Creature extends SoftBody implements OrientedBody {
         softBodyLinAlgPool.recycle(newVelocity);
       }
     }
+    
+    plannedReproductionValue = 0;
   }
 
   public String stitchName(String[] s) {

@@ -243,6 +243,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   public static final float CREATURE_STROKE_WEIGHT = 0.6;
 
   public static final int WORKER_THREAD_COUNT = 4;
+  public static final float OBJECT_TIMESTEPS_PER_YEAR = 100;
   
   // Board
   private int boardWidth;
@@ -276,7 +277,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
 
   // Time or History
   double year = 0;
-  final float OBJECT_TIMESTEPS_PER_YEAR = 100;
   double timeStep;
   int POPULATION_HISTORY_LENGTH = 200;
   int[] populationHistory;
@@ -735,7 +735,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           } else {
             if (key == ' ') selectedCreature.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
             if (key == 'v' || key == 'V') selectedCreature.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-            if (key == 'f' || key == 'F')  selectedCreature.fight(0.5, timeStep * OBJECT_TIMESTEPS_PER_YEAR, year);
+            if (key == 'f' || key == 'F') selectedCreature.fight(0.5);
             if (key == 'u' || key == 'U') selectedCreature.setHue(selectedCreature.hue + 0.02);
             if (key == 'j' || key == 'J') selectedCreature.setHue(selectedCreature.hue - 0.02);
 
@@ -743,22 +743,30 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
             if (key == 'k' || key == 'K') selectedCreature.setMouthHue(selectedCreature.mouthHue - 0.02);
             if (key == 'b' || key == 'B') {
               if (!wasPressingB) {
-                selectedCreature.reproduce(MANUAL_BIRTH_SIZE, timeStep, year);
+                selectedCreature.reproduce(MANUAL_BIRTH_SIZE);
               }
               wasPressingB = true;
             } else {
               wasPressingB = false;
             }
           }
-          
-          selectedCreature.collide(timeStep);
           selectedCreature.metabolize(timeStep, year);
-          selectedCreature.useBrain(timeStep, !userControl, Board.this.year);
+          selectedCreature.see(timeStep); 
         }
       }
       
       for (final Creature creature : creatures) {
-        creature.see(timeStep);
+        if (creature != selectedCreature) {
+          creature.see(timeStep);
+          creature.collide(timeStep);
+          creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+        }
+      }
+      
+      if (selectedCreature != null) {
+        // Update brain state to current board state
+        selectedCreature.see(timeStep);
+        selectedCreature.useBrain(timeStep, !userControl, Board.this.year);
       }
     } else {
       workDistributor.cycle();

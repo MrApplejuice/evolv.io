@@ -350,7 +350,7 @@ void mouseReleased() {
         for (final SoftBody body : evoBoard.getSoftBodiesAtPosition(worldClickCoordinate)) { 
           if (Creature.class.isInstance(body)) {
             final Creature creature = Creature.class.cast(body);
-            if (creature.getPosition().distance(new Vector2D().set(mX, mY)) <= creature.getRadius()) {
+            if (creature.getPosition().distance(worldClickCoordinate) <= creature.getRadius()) {
               evoBoard.selectedCreature = creature;
               zoom = 16;
             }

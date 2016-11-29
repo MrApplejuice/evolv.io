@@ -211,6 +211,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.get(b.getId());
       if (sbExt == null) {
         sbExt = new SoftBodyPositionAndExtents(b);
+        softBodyPositionLookup.put(b.getId(), sbExt);
       } else {
         removeFromField(sbExt);
         sbExt.update();

@@ -138,8 +138,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           final Creature me = workDistributor.popCreature();
           me.see(timeStep);
           me.metabolize(timeStep, year);
-          me.useBrain(timeStep, !userControl, Board.this.year);
-          //me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
+          me.useBrain(timeStep, !userControl);
+          me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
           me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
         catch (InterruptedException e) {
@@ -268,7 +268,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   public static final float MINIMUM_SURVIVABLE_SIZE = 0.06;
   public static final float CREATURE_STROKE_WEIGHT = 0.6;
 
-  public static final int WORKER_THREAD_COUNT = 4;
+  public static final int WORKER_THREAD_COUNT = 8;
   public static final float OBJECT_TIMESTEPS_PER_YEAR = 100;
   
   // Board
@@ -748,7 +748,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
-    iterationStartSW.lap();
+    //iterationStartSW.lap();
     
     iterationSimSW.start();
     if (userControl) {
@@ -778,27 +778,26 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
             }
           }
           selectedCreature.metabolize(timeStep, year);
-          selectedCreature.see(timeStep); 
         }
       }
       
       for (final Creature creature : creatures) {
         if (creature != selectedCreature) {
           creature.see(timeStep);
-          creature.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(creature));
-          creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
+        creature.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(creature));
+        creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
       }
       
       if (selectedCreature != null) {
         // Update brain state to current board state
         selectedCreature.see(timeStep);
-        selectedCreature.useBrain(timeStep, !userControl, Board.this.year);
+        selectedCreature.useBrain(timeStep, !userControl);
       }
     } else {
       workDistributor.cycle();
     }
-    iterationSimSW.lap();
+    //iterationSimSW.lap();
 
     iterationEndSW.start();
     synchronized (this) {
@@ -823,7 +822,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         softBodyCloneLookupField.addOrUpdate(rock.getUpdatedStaticClone());
       }
-      iterationEndRemoveLoopSW.lap();
+      //iterationEndRemoveLoopSW.lap();
       
       isIterating = false;
       notify();

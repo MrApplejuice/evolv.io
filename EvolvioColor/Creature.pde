@@ -164,7 +164,7 @@ class Creature extends SoftBody implements OrientedBody {
 
   //////////////////// SIMULATION FUNCTIONS ////////////////////
 
-  public void useBrain(double timeStep, boolean useOutput, double currentYear) {
+  public void useBrain(double timeStep, boolean useOutput) {
     double inputs[] = new double[11];
     
     double[] visionValues = visionSystem.getValues();
@@ -182,7 +182,7 @@ class Creature extends SoftBody implements OrientedBody {
       turn(output[2], timeStep);
       eat(output[3], timeStep);
       fight(output[4]);
-      if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
+      if (output[5] > 0 && board.getCurrentYear() - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
         reproduce(SAFE_SIZE);
       }
       mouthHue = Math.abs(output[10]) % 1.0;
@@ -190,14 +190,16 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public void reproduce(double size) {
-    plannedReproductionValue = size;
+    plannedReproductionValue = size; //<>//
   }
 
   @Override
   public void collide(double timeStep, List<SoftBody> colliders) {
     super.collide(timeStep, colliders);
+    
     if (plannedReproductionValue > 0) {
       doReproduce(colliders, plannedReproductionValue);
+      plannedReproductionValue = 0;
     }
     doFight(colliders, plannedFightValue, timeStep);
     plannedFightValue = 0;
@@ -349,12 +351,12 @@ class Creature extends SoftBody implements OrientedBody {
       for (final SoftBody possibleParentBody : colliders) {
         if (Creature.class.isInstance(possibleParentBody)) {
           final Creature possibleParent = Creature.class.cast(possibleParentBody);
-          if ((possibleParent).brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
+          if (possibleParent.brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
             final double distance = position.distance(possibleParent.getPosition());
             double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
             if (distance < combinedRadius) {
-              parentsList.add((Creature)possibleParent);
-              availableEnergy += ((Creature)possibleParent).getBabyEnergy();
+              parentsList.add(possibleParent);
+              availableEnergy += possibleParent.getBabyEnergy();
             }
           }
         }
@@ -401,8 +403,6 @@ class Creature extends SoftBody implements OrientedBody {
         softBodyLinAlgPool.recycle(newVelocity);
       }
     }
-    
-    plannedReproductionValue = 0;
   }
 
   public String stitchName(String[] s) {

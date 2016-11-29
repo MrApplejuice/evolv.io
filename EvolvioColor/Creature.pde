@@ -189,11 +189,7 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
 
-  public void reproduce(double size) {
-    plannedReproductionValue = size; //<>//
-  }
-
-  @Override
+  @Override //<>//
   public void collide(double timeStep, List<SoftBody> colliders) {
     super.collide(timeStep, colliders);
     
@@ -201,8 +197,10 @@ class Creature extends SoftBody implements OrientedBody {
       doReproduce(colliders, plannedReproductionValue);
       plannedReproductionValue = 0;
     }
-    doFight(colliders, plannedFightValue, timeStep);
-    plannedFightValue = 0;
+    if (plannedFightValue > 0) {
+      doFight(colliders, plannedFightValue, timeStep);
+      plannedFightValue = 0;
+    }
   }
   
   public void metabolize(double timeStep, double currentYear) {
@@ -269,7 +267,7 @@ class Creature extends SoftBody implements OrientedBody {
     plannedFightValue = amount;
   }
     
-  private void doFight(List<SoftBody> colliders, double amount, double timeStep) {
+  protected void doFight(List<SoftBody> colliders, double amount, double timeStep) {
     if (amount > 0 && board.getCurrentYear() - birthTime >= MATURE_AGE) {
       fightLevel = amount * 100; // 100 copied from useBrain - kinda random?
       loseEnergy(fightLevel * FIGHT_ENERGY * energy * timeStep);
@@ -342,7 +340,11 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
 
-  private void doReproduce(List<SoftBody> colliders, double babySize) {
+  public void reproduce(double size) {
+    plannedReproductionValue = size;
+  }
+
+  protected void doReproduce(List<SoftBody> colliders, double babySize) {
     int highestGen = 0;
     if (babySize >= 0) {
       parentsList.clear();

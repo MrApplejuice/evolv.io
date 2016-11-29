@@ -20,6 +20,9 @@ public interface SynchronizedTileInteraction {
   and also prevent deadlocks.
  */
 public interface AbstractBoardInterface {
+  // Creates a new unique id for a new soft body.
+  public int generateUniqueId();
+  
   // Adds a new creature to the Board (reproduction)
   public void addCreature(Creature creature);
   
@@ -35,11 +38,6 @@ public interface AbstractBoardInterface {
     will be the background color
    */
   public color getTileColor(Vector2D pos);
-  
-  /**
-     Returns the a list of soft bodies at the given location.
-   */
-  public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos);
   
   /**
     Starts a synchronized transation with a tile at the given location.
@@ -84,14 +82,12 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
      */
     public synchronized Creature popCreature() throws InterruptedException {
       if (cycleRunning) {
-        //System.out.println("returning from: " + globalIndex + "  " + cycleStartSize);
         globalIndex++;
       }
       notifyAll();
       while ((!cycleRunning) || (dispatchIndex >= cycleStartSize)) {
         wait();
       }
-      //System.out.println("serving: " + dispatchIndex + "  " + cycleStartSize);
       return creatureList.get(dispatchIndex++);
     }
     
@@ -134,10 +130,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       while (!Thread.interrupted()) {
         try {
           final Creature me = workDistributor.popCreature();
-          me.collide(timeStep);
           me.see(timeStep);
           me.metabolize(timeStep, year);
           me.useBrain(timeStep, !userControl, Board.this.year);
+          me.collide(timeStep);
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -146,6 +142,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     }
   };
 
+  /**
+    Encapsulates the old lookup table "softBodiesInPositions". This 
+    class maintains an internal grid that is aligned with the tile grid. The
+    this allows a quicker location-based lookup for (smallish) creatures.
+   */
   private class SoftBodyLookupField {
     private class SoftBodyPositionAndExtents {
       public SoftBody body;
@@ -199,7 +200,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       }
     }
     
-    public void addOrUpdateBody(SoftBody b) {
+    public void addOrUpdate(SoftBody b) {
       SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.get(b.getId());
       if (sbExt == null) {
         sbExt = new SoftBodyPositionAndExtents(b);
@@ -904,19 +905,23 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
 
   private synchronized void mergeNewCreaturePool() {
     this.creatures.addAll(this.newCreatures);
+    for (final Creature c : this.newCreatures) {
+      softBodyLookupField.addOrUpdate(c);
+    }
     this.newCreatures.clear();
   }
 
   private void maintainCreatureMinimum(boolean choosePreexisting) {
     while ((newCreatures.size() + creatures.size()) < creatureMinimum) {
       if (choosePreexisting) {
-        Creature c = getRandomCreature();
-        c.addEnergy(c.SAFE_SIZE);
-        c.reproduce(c.SAFE_SIZE, timeStep, year);
+        final Creature c = getRandomCreature();
+        c.addEnergy(Creature.SAFE_SIZE);
+        c.reproduce(Creature.SAFE_SIZE, timeStep, year);
       } else {
-        creatures.add(new Creature(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
+        Creature newCreature = new Creature(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 
-          this, year, random(0, 2 * PI), 0, "", "[PRIMORDIAL]", true, null, 1, random(0, 1)));
+          this, year, random(0, 2 * PI), 0, "", "[PRIMORDIAL]", true, null, 1, random(0, 1));
+        newCreatures.add(newCreature);     
       }
     }
     mergeNewCreaturePool();

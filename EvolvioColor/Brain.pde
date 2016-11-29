@@ -59,7 +59,7 @@ class Brain {
   }
 
   //this would be a static method, but processing doesn't like mixing types
-  public Brain evolve(ArrayList<Creature> parents) {
+  public Brain evolve(List<Creature> parents) {
     int parentsTotal = parents.size();
     Axon[][][] newBrain = new Axon[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT - 1];
     double[][] newNeurons = new double[BRAIN_WIDTH][BRAIN_HEIGHT];

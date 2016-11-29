@@ -73,6 +73,12 @@ static class Vector2D {
     return this;
   }
   
+  public Vector2D inplaceMul(double scalar) {
+    components[0] *= scalar;
+    components[1] *= scalar;
+    return this;
+  }
+  
   public double dotProduct(Vector2D other) {
     return components[0] * other.components[0] + components[1] * other.components[1]; 
   }
@@ -155,6 +161,9 @@ static class Matrix2D {
 /**
   Thread-safe pool to speed up vector interactions. Returned objects 
   are not thread safe though(!)
+  
+  Note to myself: this was total overdisgn and probably not neccessary.
+  Constructing Vector2D or Matrix2D types is not really expensive. Overdesign!
  */
 static class LinearAlgebraPool {
   private ArrayList<Vector2D> vectors = new ArrayList<Vector2D>();

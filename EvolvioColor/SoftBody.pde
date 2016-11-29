@@ -52,10 +52,8 @@ class SoftBody {
     hue = thue;
     saturation = tsaturation;
     brightness = tbrightness;
-    setSBIP(false);
-    setSBIP(false); // Just to set previous SBIPs as well.
     birthTime = bt;
-    ENERGY_DENSITY = 1.0 / (tb.MINIMUM_SURVIVABLE_SIZE * tb.MINIMUM_SURVIVABLE_SIZE * PI);
+    ENERGY_DENSITY = 1.0 / (Board.MINIMUM_SURVIVABLE_SIZE * Board.MINIMUM_SURVIVABLE_SIZE * PI);
   }
 
   public Vector2D getPosition() {
@@ -66,39 +64,6 @@ class SoftBody {
     return id;
   }
   
-  public void setSBIP(boolean shouldRemove) {
-    double radius = getRadius() * FIGHT_RANGE;
-    prevSBIPMinX = SBIPMinX;
-    prevSBIPMinY = SBIPMinY;
-    prevSBIPMaxX = SBIPMaxX;
-    prevSBIPMaxY = SBIPMaxY;
-    SBIPMinX = xBound((int)(Math.floor(px - radius)));
-    SBIPMinY = yBound((int)(Math.floor(py - radius)));
-    SBIPMaxX = xBound((int)(Math.floor(px + radius)));
-    SBIPMaxY = yBound((int)(Math.floor(py + radius)));
-    if (prevSBIPMinX != SBIPMinX || prevSBIPMinY != SBIPMinY ||
-      prevSBIPMaxX != SBIPMaxX || prevSBIPMaxY != SBIPMaxY) {
-      if (shouldRemove) {
-        for (int x = prevSBIPMinX; x <= prevSBIPMaxX; x++) {
-          for (int y = prevSBIPMinY; y <= prevSBIPMaxY; y++) {
-            if (x < SBIPMinX || x > SBIPMaxX ||
-              y < SBIPMinY || y > SBIPMaxY) {
-              board.softBodiesInPositions[x][y].remove(this);
-            }
-          }
-        }
-      }
-      for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
-        for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
-          if (x < prevSBIPMinX || x > prevSBIPMaxX ||
-            y < prevSBIPMinY || y > prevSBIPMaxY) {
-            board.softBodiesInPositions[x][y].add(this);
-          }
-        }
-      }
-    }
-  }
-
   public int xBound(int x) {
     return Math.min(Math.max(x, 0), board.getBoardWidth() - 1);
   }
@@ -117,52 +82,33 @@ class SoftBody {
     return Math.min(Math.max(y, radius), board.getBoardHeight() - radius);
   }
 
-  public void collide(double timeStep) {
-    colliders = new ArrayList<SoftBody>(0);
-    for (int x = SBIPMinX; x <= SBIPMaxX; x++) {
-      for (int y = SBIPMinY; y <= SBIPMaxY; y++) {
-        for (int i = 0; i < board.softBodiesInPositions[x][y].size(); i++) {
-          SoftBody newCollider = (SoftBody)board.softBodiesInPositions[x][y].get(i);
-          if (!colliders.contains(newCollider) && (newCollider != this)) {
-            colliders.add(newCollider);
-          }
-        }
-      }
-    }
-    for (int i = 0; i < colliders.size(); i++) {
-      SoftBody collider = colliders.get(i);
-      
-      if (collider == null) {
-        System.out.println("-------------- Found collider == null!!!");
-        continue;
-      }
-      
-      float distance = dist((float)px, (float)py, (float)collider.px, (float)collider.py);
+  public void collide(double timeStep, List<SoftBody> colliders) {
+    for (final SoftBody collider : colliders) {
+      double distance = position.distance(collider.getPosition());
       double combinedRadius = getRadius() + collider.getRadius();
       if (distance < combinedRadius) {
         double force = combinedRadius * COLLISION_FORCE;
-        vx += ((px - collider.px) / distance) * force / getMass();
-        vy += ((py - collider.py) / distance) * force / getMass();
+        velocity.set(position).inplaceSub(collider.getPosition()).inplaceMul(force / distance / getMass());
       }
     }
     fightLevel = 0;
   }
 
   public void applyMotions(double timeStep) {
-    px = xBodyBound(px + vx * timeStep);
-    py = yBodyBound(py + vy * timeStep);
-    vx *= Math.max(0, 1 - FRICTION / getMass());
-    vy *= Math.max(0, 1 - FRICTION / getMass());
-    setSBIP(true);
+    final Vector2D movement = softBodyLinAlgPool.getVector2D();
+    movement.set(velocity).inplaceMul(timeStep);
+    position.inplaceAdd(movement);
+    velocity.inplaceMul(Math.max(0, 1 - FRICTION / getMass()));
+    softBodyLinAlgPool.recycle(movement);
   }
 
   public void drawSoftBody(DrawConfiguration drawConfig, boolean isSelected, float scaleUp, float camZoom, boolean showVision) {
     double radius = getRadius();
     stroke(0);
-    strokeWeight(board.CREATURE_STROKE_WEIGHT);
+    strokeWeight(drawConfig.getStrokeWeight());
     fill((float)hue, (float)saturation, (float)brightness);
     ellipseMode(RADIUS);
-    ellipse((float)(px * scaleUp), (float)(py * scaleUp), (float)(radius * scaleUp), (float)(radius * scaleUp));
+    ellipse((float)(position.getX() * scaleUp), (float)(position.getY() * scaleUp), (float)(radius * scaleUp), (float)(radius * scaleUp));
   }
 
   public double getRadius() {

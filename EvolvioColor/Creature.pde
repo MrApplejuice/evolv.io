@@ -36,6 +36,8 @@ class Creature extends SoftBody implements OrientedBody {
   private String name;
   private String parents;
   private int gen;
+  
+  private List<Creature> parentsList = new ArrayList<Creature>();
 
   // Vision or View or Preference
   private VisionSystem visionSystem = new VisionSystem(softBodyLinAlgPool);
@@ -51,7 +53,7 @@ class Creature extends SoftBody implements OrientedBody {
   }
 
   public Creature(int id, Vector2D pos, Vector2D vel, double tenergy, 
-    double tdensity, double thue, double tsaturation, double tbrightness, Board tb, double bt, 
+    double tdensity, double thue, double tsaturation, double tbrightness, AbstractBoardInterface tb, double bt, 
     double rot, double tvr, String tname, String tparents, boolean mutateName, 
     Brain brain, int tgen, double tmouthHue) {
 
@@ -323,8 +325,8 @@ class Creature extends SoftBody implements OrientedBody {
     }
     int highestGen = 0;
     if (babySize >= 0) {
-      ArrayList<Creature> parents = new ArrayList<Creature>(0);
-      parents.add(this);
+      parentsList.clear();
+      parentsList.add(this);
       double availableEnergy = getBabyEnergy();
       for (final SoftBody possibleParentBody : colliders) {
         if (Creature.class.isInstance(possibleParentBody)) {
@@ -333,29 +335,32 @@ class Creature extends SoftBody implements OrientedBody {
             final double distance = position.distance(possibleParent.getPosition());
             double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
             if (distance < combinedRadius) {
-              parents.add((Creature)possibleParent);
+              parentsList.add((Creature)possibleParent);
               availableEnergy += ((Creature)possibleParent).getBabyEnergy();
             }
           }
         }
       }
       if (availableEnergy > babySize) {
-        double newPX = random(-0.01, 0.01);
-        double newPY = random(-0.01, 0.01); //To avoid landing directly on parents, resulting in division by 0)
+        final Vector2D newPosition = softBodyLinAlgPool.getVector2D();
+        final Vector2D newVelocity = softBodyLinAlgPool.getVector2D();
         double newHue = 0;
         double newSaturation = 0;
         double newBrightness = 0;
         double newMouthHue = 0;
-        int parentsTotal = parents.size();
+        int parentsTotal = parentsList.size();
         String[] parentNames = new String[parentsTotal];
-        Brain newBrain = brain.evolve(parents);
+        Brain newBrain = brain.evolve(parentsList);
         for (int i = 0; i < parentsTotal; i++) {
-          int chosenIndex = (int)random(0, parents.size());
-          Creature parent = parents.get(chosenIndex);
-          parents.remove(chosenIndex);
+          int chosenIndex = (int) random(0, parentsList.size());
+          final Creature parent = parentsList.get(chosenIndex);
+          parentsList.remove(chosenIndex);
+          
+          // Weird accumulation
           parent.energy -= babySize * (parent.getBabyEnergy() / availableEnergy);
-          newPX += parent.px / parentsTotal;
-          newPY += parent.py / parentsTotal;
+          
+          // Normal averaging/determining max value
+          newPosition.inplaceAdd(parent.getPosition());
           newHue += parent.hue / parentsTotal;
           newSaturation += parent.saturation / parentsTotal;
           newBrightness += parent.brightness / parentsTotal;
@@ -365,12 +370,17 @@ class Creature extends SoftBody implements OrientedBody {
             highestGen = parent.gen;
           }
         }
+        newPosition.inplaceMul(1.0 / (double) parentsTotal);
         newSaturation = 1;
         newBrightness = 1;
-        board.addCreature(new Creature(newPX, newPY, 0, 0, 
+        
+        board.addCreature(new Creature(board.generateUniqueId(), newPosition, newVelocity, 
           babySize, density, newHue, newSaturation, newBrightness, board, currentYear, random(0, 2 * PI), 0, 
           stitchName(parentNames), andifyParents(parentNames), true, 
           newBrain, highestGen + 1, newMouthHue));
+          
+        softBodyLinAlgPool.recycle(newPosition);
+        softBodyLinAlgPool.recycle(newVelocity);
       }
     }
   }

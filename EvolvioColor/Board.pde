@@ -139,7 +139,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           me.see(timeStep);
           me.metabolize(timeStep, year);
           me.useBrain(timeStep, !userControl, Board.this.year);
-          me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
+          //me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
           me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
         catch (InterruptedException e) {
@@ -168,9 +168,9 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         radius = body.getRadius();
         
         gridMinX = Math.max(0, (int) (center.getX() - radius));
-        gridMaxX = Math.max(width - 1, (int) (center.getX() + radius));
+        gridMaxX = Math.min(width - 1, (int) (center.getX() + radius));
         gridMinY = Math.max(0, (int) (center.getY() - radius));
-        gridMaxY = Math.max(height - 1, (int) (center.getY() + radius));
+        gridMaxY = Math.min(height - 1, (int) (center.getY() + radius));
       }
       
       public SoftBodyPositionAndExtents(SoftBody b) {
@@ -200,8 +200,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     }
     
     private void removeFromField(SoftBodyPositionAndExtents sbExt) {
-      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
-        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+      for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
           softBodyField.get(x).get(y).remove(sbExt.body);
         }
       }
@@ -217,8 +217,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         sbExt.update();
       }
       
-      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
-        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+      for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
           softBodyField.get(x).get(y).add(b);
         }
       }
@@ -246,8 +246,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       
       final List<SoftBody> result = new ArrayList<SoftBody>();
       final Vector2D pos = new Vector2D();
-      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
-        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+      for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
           for (SoftBody candidate : getBodiesAt(pos.set(x, y))) {
             if (candidate.getId() != body.getId()) {
               if (!result.contains(candidate)) {
@@ -748,7 +748,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
-    //iterationStartSW.lap();
+    iterationStartSW.lap();
     
     iterationSimSW.start();
     if (userControl) {
@@ -798,7 +798,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     } else {
       workDistributor.cycle();
     }
-    //iterationSimSW.lap();
+    iterationSimSW.lap();
 
     iterationEndSW.start();
     synchronized (this) {
@@ -823,7 +823,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         softBodyCloneLookupField.addOrUpdate(rock.getUpdatedStaticClone());
       }
-      //iterationEndRemoveLoopSW.lap();
+      iterationEndRemoveLoopSW.lap();
       
       isIterating = false;
       notify();

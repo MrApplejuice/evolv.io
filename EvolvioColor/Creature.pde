@@ -48,6 +48,9 @@ class Creature extends SoftBody implements OrientedBody {
   private double vr = 0;
   private double rotation = 0;
 
+  private boolean electedToReproduce = false;
+  private double plannedFightValue = 0;
+
   public double getRotation() {
     return rotation;
   }
@@ -167,9 +170,11 @@ class Creature extends SoftBody implements OrientedBody {
     for (int i = 0; i < 9; i++) {
       inputs[i] = visionValues[i];
     }
-    inputs[9]= energy;
+    inputs[9] = energy;
     inputs[10] = mouthHue;
     brain.input(inputs);
+    
+    electedToReproduce = false;
 
     if (useOutput) {
       double[] output = brain.outputs();
@@ -177,14 +182,27 @@ class Creature extends SoftBody implements OrientedBody {
       accelerate(output[1], timeStep);
       turn(output[2], timeStep);
       eat(output[3], timeStep);
-      fight(output[4], timeStep * 100, currentYear);
+      fight(output[4]);
       if (output[5] > 0 && currentYear - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
-        reproduce(SAFE_SIZE, timeStep, currentYear);
+        reproduce();
       }
       mouthHue = Math.abs(output[10]) % 1.0;
     }
   }
 
+  public void reproduce() {
+    electedToReproduce = true;
+  }
+
+  @Override
+  public void collide(double timeStep, List<SoftBody> colliders) {
+    super.collide(timeStep, colliders);
+    if (electedToReproduce) {
+      doReproduce(colliders, SAFE_SIZE);
+    }
+    doFight(colliders, plannedFightValue, timeStep);
+  }
+  
   public void metabolize(double timeStep, double currentYear) {
     double age = AGE_FACTOR * (currentYear - birthTime); // the older the more work necessary
     loseEnergy(energy * METABOLISM_ENERGY * age * timeStep);
@@ -208,7 +226,7 @@ class Creature extends SoftBody implements OrientedBody {
     vr += 0.04 * amount * timeStep / getMass();
     loseEnergy(Math.abs(amount * TURN_ENERGY * energy * timeStep));
   }
-
+  
   public void eat(final double attemptedAmount, final double timeStep) {
     final double amount = attemptedAmount / (1.0 + velocity.length() * EAT_WHILE_MOVING_INEFFICIENCY_MULTIPLIER); // The faster you're moving, the less efficiently you can eat.
     if (amount < 0) {
@@ -245,12 +263,15 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
 
-  public void fight(double amount, double timeStep, double currentYear) {
-    if (amount > 0 && currentYear - birthTime >= MATURE_AGE) {
-      fightLevel = amount;
+  public void fight(double amount) {
+    plannedFightValue = amount;
+  }
+    
+  private void doFight(List<SoftBody> colliders, double amount, double timeStep) {
+    if (amount > 0 && board.getCurrentYear() - birthTime >= MATURE_AGE) {
+      fightLevel = amount * 100; // 100 copied from useBrain - kinda random?
       loseEnergy(fightLevel * FIGHT_ENERGY * energy * timeStep);
-      for (int i = 0; i < colliders.size(); i++) {
-        SoftBody collider = colliders.get(i);
+      for (final SoftBody collider : colliders) {
         if (Creature.class.isInstance(collider)) {
           final Creature colliderCreature = Creature.class.cast(collider);
           final double distance = position.distance(colliderCreature.getPosition());
@@ -319,10 +340,7 @@ class Creature extends SoftBody implements OrientedBody {
     }
   }
 
-  public void reproduce(double babySize, double timeStep, double currentYear) {
-    if (colliders == null) {
-      collide(timeStep);
-    }
+  private void doReproduce(List<SoftBody> colliders, double babySize) {
     int highestGen = 0;
     if (babySize >= 0) {
       parentsList.clear();
@@ -375,7 +393,7 @@ class Creature extends SoftBody implements OrientedBody {
         newBrightness = 1;
         
         board.addCreature(new Creature(board.generateUniqueId(), newPosition, newVelocity, 
-          babySize, density, newHue, newSaturation, newBrightness, board, currentYear, random(0, 2 * PI), 0, 
+          babySize, density, newHue, newSaturation, newBrightness, board, board.getCurrentYear(), random(0, 2 * PI), 0, 
           stitchName(parentNames), andifyParents(parentNames), true, 
           newBrain, highestGen + 1, newMouthHue));
           

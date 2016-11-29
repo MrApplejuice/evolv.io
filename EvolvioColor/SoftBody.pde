@@ -29,16 +29,6 @@ class SoftBody {
   final float FIGHT_RANGE = 2.0;
   double fightLevel = 0;
 
-  int prevSBIPMinX;
-  int prevSBIPMinY;
-  int prevSBIPMaxX;
-  int prevSBIPMaxY;
-  int SBIPMinX;
-  int SBIPMinY;
-  int SBIPMaxX;
-  int SBIPMaxY;
-  ArrayList<SoftBody> colliders;
-
   public SoftBody(int id, Vector2D pos, Vector2D vel, double tenergy, double tdensity, 
     double thue, double tsaturation, double tbrightness, AbstractBoardInterface board, double bt) {
     

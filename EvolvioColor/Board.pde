@@ -28,6 +28,7 @@ public interface AbstractBoardInterface {
   
   public int getBoardWidth();
   public int getBoardHeight();
+  public double getCurrentYear();
   
   // Returns the board's background color
   public color getBackgroundColor();
@@ -134,6 +135,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           me.metabolize(timeStep, year);
           me.useBrain(timeStep, !userControl, Board.this.year);
           me.collide(timeStep);
+          me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -378,6 +380,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   @Override
   public int getBoardHeight() {
     return boardHeight;
+  }
+  
+  @Override
+  public double getCurrentYear() {
+    return year;
   }
   
   @Override
@@ -791,9 +798,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   public synchronized void finishIterate(double timeStep) {
     for (final SoftBody rock : rocks) {
       rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-    }
-    for (final Creature creature : creatures) {
-      creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
     }
     
     /*

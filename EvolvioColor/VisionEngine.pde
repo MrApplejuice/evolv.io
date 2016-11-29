@@ -28,7 +28,7 @@ static class VisionSystem {
     }
   }
   
-  public void updateVision(AbstractBoardInterface board, Vector2D origin, double rotation, Object ignore) {
+  public void updateVision(AbstractBoardInterface board, Vector2D origin, double rotation, SoftBody ignore) {
     float[] hsbValues = new float[3];
     
     final Vector2D tmpV = linAlgPool.getVector2D();
@@ -75,11 +75,11 @@ static class VisionSystem {
       
       
       for (SoftBody body : potentialVisionOccluders) {
-        if (body == ignore) {
+        if ((ignore != null) && (body.getId() == ignore.getId())) {
           continue;
         }
         
-        final Vector2D pos = linAlgPool.getVector2D().set(body.px, body.py);
+        final Vector2D pos = linAlgPool.getVector2D().set(body.getPosition());
         pos.inplaceSub(origin);
         
         final double radius = body.getRadius();

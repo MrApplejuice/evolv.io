@@ -29,7 +29,6 @@ class Creature extends SoftBody implements OrientedBody {
   public static final int ENERGY_HISTORY_LENGTH = 6;
   public static final float CROSS_SIZE = 0.022;
 
-  private double currentEnergy;
   private double[] previousEnergy = new double[ENERGY_HISTORY_LENGTH];
 
   // Family
@@ -47,10 +46,12 @@ class Creature extends SoftBody implements OrientedBody {
   private double mouthHue;
   private double vr = 0;
   private double rotation = 0;
+  private double fightLevel = 0;
 
   private double plannedReproductionValue = 0;
   private double plannedFightValue = 0;
-
+  
+  
   public double getRotation() {
     return rotation;
   }
@@ -500,22 +501,25 @@ class Creature extends SoftBody implements OrientedBody {
     brightness = Math.min(Math.max(set, 0), 1);
   }
 
-  /*public void setVisionAngle(double set) {
-   visionAngle = set;//Math.min(Math.max(set, -Math.PI/2), Math.PI/2);
-   while(visionAngle < -Math.PI) {
-   visionAngle += Math.PI*2;
-   }
-   while(visionAngle > Math.PI) {
-   visionAngle -= Math.PI*2;
-   }
-   }
-   public void setVisionDistance(double set) {
-   visionDistance = Math.min(Math.max(set, 0), MAX_VISION_DISTANCE);
-   }*/
-  /*public double getVisionStartX() {
-   return px;//+getRadius()*Math.cos(rotation);
-   }
-   public double getVisionStartY() {
-   return py;//+getRadius()*Math.sin(rotation);
-   }*/
+
+  private Creature theClone = null;
+  @Override
+  public SoftBody getUpdatedStaticClone() {
+   if (theClone == null) {
+     theClone = new Creature(getId(), position, velocity, energy, density, hue, saturation, brightness, board, birthTime, 
+                             rotation, vr, name, parents, false, brain, gen, mouthHue);
+    } else {
+      updateStaticCloneCreature(theClone);
+    }
+    return theClone;
+  }
+  
+  protected void updateStaticCloneCreature(Creature theClone) {
+    theClone.preferredRank = preferredRank;
+    theClone.mouthHue = mouthHue;
+    theClone.vr = vr;
+    theClone.rotation = rotation;
+    theClone.fightLevel = fightLevel;
+    updateStaticCloneSoftBody(theClone);
+ }
 }

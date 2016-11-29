@@ -38,7 +38,7 @@ class NameGenerator {
       letterFactor -= LETTER_FREQUENCIES[letterChoice];
       letterChoice++;
     }
-    return (char)(letterChoice + 96);
+    return (char) (letterChoice + 96);
   }
 
   public String sanitizeName(String input) {

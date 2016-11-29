@@ -27,7 +27,6 @@ class SoftBody {
   final float FRICTION = 0.004;
   final float COLLISION_FORCE = 0.01;
   final float FIGHT_RANGE = 2.0;
-  double fightLevel = 0;
 
   public SoftBody(int id, Vector2D pos, Vector2D vel, double tenergy, double tdensity, 
     double thue, double tsaturation, double tbrightness, AbstractBoardInterface board, double bt) {
@@ -81,7 +80,6 @@ class SoftBody {
         velocity.set(position).inplaceSub(collider.getPosition()).inplaceMul(force / distance / getMass());
       }
     }
-    fightLevel = 0;
   }
 
   public void applyMotions(double timeStep) {
@@ -111,5 +109,31 @@ class SoftBody {
 
   public double getMass() {
     return energy / ENERGY_DENSITY * density;
+  }
+  
+  /**
+    This is a specialized function that copies the state of the current object into an internally 
+    referenced static clone. This is done to copy the state so that all soft bodies can be updated 
+    independently from each other - finally! 
+   */
+  private SoftBody theClone = null;
+  public SoftBody getUpdatedStaticClone() {
+   if (theClone == null) {
+      theClone = new SoftBody(id, position, velocity, energy, density, hue, saturation, brightness, board, birthTime);
+    } else {
+      updateStaticCloneSoftBody(theClone);
+    }
+    return theClone;
+  }
+  
+  protected void updateStaticCloneSoftBody(SoftBody theClone) {
+    theClone.position.set(position);
+    theClone.velocity.set(velocity);
+    theClone.energy = energy;
+    theClone.density = density; 
+    theClone.hue = hue; 
+    theClone.saturation = saturation; 
+    theClone.brightness = brightness; 
+    theClone.ENERGY_DENSITY = ENERGY_DENSITY;
   }
 }

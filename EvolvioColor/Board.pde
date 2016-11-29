@@ -46,6 +46,11 @@ public interface AbstractBoardInterface {
     Returns fals if the location was out of bounds!
    */
   public boolean interactWithTileAtLocation(Vector2D location, SynchronizedTileInteraction handler);
+  
+  /**
+    Returns a list of soft bodies at the given grid locations.
+   */
+  public List<SoftBody> getSoftBodiesAtPosition(Vector2D v);
 };
 
 interface DrawConfiguration {
@@ -134,7 +139,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           me.see(timeStep);
           me.metabolize(timeStep, year);
           me.useBrain(timeStep, !userControl, Board.this.year);
-          me.collide(timeStep);
+          me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
           me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
         catch (InterruptedException e) {
@@ -234,6 +239,26 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       }
       return EMPTY_SOFT_BODY_LIST;
     }
+    
+    public List<SoftBody> getCollisionTargetsFor(SoftBody body) {
+      SoftBodyPositionAndExtents sbExt = new SoftBodyPositionAndExtents(body);
+      
+      final List<SoftBody> result = new ArrayList<SoftBody>();
+      final Vector2D pos = new Vector2D();
+      for (int x = sbExt.gridMinX; x < sbExt.gridMaxX; x++) {
+        for (int y = sbExt.gridMinY; y < sbExt.gridMaxY; y++) {
+          for (SoftBody candidate : getBodiesAt(pos.set(x, y))) {
+            if (candidate.getId() != body.getId()) {
+              if (!result.contains(candidate)) {
+                result.add(candidate);
+              }
+            }
+          }
+        }
+      }
+      
+      return result;
+    }
   };
   
   
@@ -250,7 +275,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private int boardHeight;
   
   private Tile[][] tiles;
-  private SoftBodyLookupField softBodyLookupField;
+  private SoftBodyLookupField softBodyCloneLookupField;
 
   // Creature
   int creatureMinimum;
@@ -336,13 +361,15 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     MIN_TEMPERATURE = min;
     MAX_TEMPERATURE = max;
 
-    softBodyLookupField = new SoftBodyLookupField(boardWidth, boardHeight);
+    softBodyCloneLookupField = new SoftBodyLookupField(boardWidth, boardHeight);
 
     ROCKS_TO_ADD = rta;
     rocks = new ArrayList<SoftBody>(0);
     for (int i = 0; i < ROCKS_TO_ADD; i++) {
-      rocks.add(new SoftBody(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
-        getRandomSize(), ROCK_DENSITY, hue(ROCK_COLOR), saturation(ROCK_COLOR), brightness(ROCK_COLOR), this, year));
+      SoftBody newRock = new SoftBody(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
+        getRandomSize(), ROCK_DENSITY, hue(ROCK_COLOR), saturation(ROCK_COLOR), brightness(ROCK_COLOR), this, year);
+      rocks.add(newRock);
+      softBodyCloneLookupField.addOrUpdate(newRock.getUpdatedStaticClone());
     }
 
     creatureMinimum = cm;
@@ -402,11 +429,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
   
   @Override
-  public List<SoftBody> getSoftBodiesAtPosition(Vector2D pos) {
-    return softBodyLookupField.getBodiesAt(pos);
-  }
-  
-  @Override
   public boolean interactWithTileAtLocation(Vector2D pos, SynchronizedTileInteraction handler) {
     final int tileX = (int) pos.getX();
     final int tileY = (int) pos.getY();
@@ -434,6 +456,11 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+  }
+  
+  @Override
+  public List<SoftBody> getSoftBodiesAtPosition(Vector2D v) {
+    return softBodyCloneLookupField.getBodiesAt(v);
   }
   
   public synchronized void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
@@ -671,7 +698,6 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private StopWatch iterationEndSW = new StopWatch("iteration end");
   
   private StopWatch iterationEndRemoveLoopSW = new StopWatch("iteration end remove loop");
-  private StopWatch iterationEndFinishSW = new StopWatch("iteration end finish func");
   public void iterate(double timeStep) {
     iterationStartSW.start();
     
@@ -758,7 +784,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       for (final Creature creature : creatures) {
         if (creature != selectedCreature) {
           creature.see(timeStep);
-          creature.collide(timeStep);
+          creature.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(creature));
           creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         }
       }
@@ -786,35 +812,23 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           }
           
           me.returnToEarth();
-          softBodyLookupField.remove(me);
+          softBodyCloneLookupField.remove(me.getUpdatedStaticClone());
           creatureIterator.remove();
+        } else {
+          softBodyCloneLookupField.addOrUpdate(me.getUpdatedStaticClone());
         }
       }
+      for (final SoftBody rock : rocks) {
+        rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+        softBodyCloneLookupField.addOrUpdate(rock.getUpdatedStaticClone());
+      }
       //iterationEndRemoveLoopSW.lap();
-
-      iterationEndFinishSW.start();
-      finishIterate(timeStep);
-      //iterationEndFinishSW.lap();
       
       isIterating = false;
       notify();
     }
 
     //iterationEndSW.lap();
-  }
-
-  public synchronized void finishIterate(double timeStep) {
-    for (final SoftBody rock : rocks) {
-      rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-    }
-    
-    /*
-    if (Math.floor(fileSaveTimes[1] / imageSaveInterval) != Math.floor(year / imageSaveInterval)) {
-      prepareForFileSave(1);
-    }
-    if (Math.floor(fileSaveTimes[3] / textSaveInterval) != Math.floor(year / textSaveInterval)) {
-      prepareForFileSave(3);
-    }*/
   }
 
   private double getGrowthRate(double theTime) {
@@ -918,7 +932,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private synchronized void mergeNewCreaturePool() {
     this.creatures.addAll(this.newCreatures);
     for (final Creature c : this.newCreatures) {
-      softBodyLookupField.addOrUpdate(c);
+      softBodyCloneLookupField.addOrUpdate(c.getUpdatedStaticClone());
     }
     this.newCreatures.clear();
   }
@@ -928,7 +942,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       if (choosePreexisting) {
         final Creature c = getRandomCreature();
         c.addEnergy(Creature.SAFE_SIZE);
-        c.reproduce(Creature.SAFE_SIZE, timeStep, year);
+        c.reproduce(Creature.SAFE_SIZE);
+        c.collide(0, softBodyCloneLookupField.getCollisionTargetsFor(c));
       } else {
         Creature newCreature = new Creature(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 

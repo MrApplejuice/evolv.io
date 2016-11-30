@@ -6,6 +6,9 @@ static interface OrientedBody {
   public double getRotation();
 };
 
+/**
+  Restriction: Soft bodies should be designed thread-safe! 
+ */
 class SoftBody {
   protected LinearAlgebraPool softBodyLinAlgPool = new LinearAlgebraPool();
   

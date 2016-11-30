@@ -7,6 +7,9 @@ static NameGenerator nameGenerator = null;
   }
 }
 
+/**
+  Creatures - just like SoftBodies - should be thread safe!
+ */
 class Creature extends SoftBody implements OrientedBody {
   public static final double BRIGHTNESS_THRESHOLD = 0.7;
   
@@ -188,7 +191,7 @@ class Creature extends SoftBody implements OrientedBody {
       mouthHue = Math.abs(output[10]) % 1.0;
     }
   }
-
+ //<>//
   @Override //<>//
   public void collide(double timeStep, List<SoftBody> colliders) {
     super.collide(timeStep, colliders);
@@ -502,26 +505,4 @@ class Creature extends SoftBody implements OrientedBody {
   public void setBrightness(double set) {
     brightness = Math.min(Math.max(set, 0), 1);
   }
-
-
-  private Creature theClone = null;
-  @Override
-  public SoftBody getUpdatedStaticClone() {
-   if (theClone == null) {
-     theClone = new Creature(getId(), position, velocity, energy, density, hue, saturation, brightness, board, birthTime, 
-                             rotation, vr, name, parents, false, brain, gen, mouthHue);
-    } else {
-      updateStaticCloneCreature(theClone);
-    }
-    return theClone;
-  }
-  
-  protected void updateStaticCloneCreature(Creature theClone) {
-    theClone.preferredRank = preferredRank;
-    theClone.mouthHue = mouthHue;
-    theClone.vr = vr;
-    theClone.rotation = rotation;
-    theClone.fightLevel = fightLevel;
-    updateStaticCloneSoftBody(theClone);
- }
 }

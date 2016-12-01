@@ -30,6 +30,7 @@ public static class SoftBodyShadow {
   
   private Vector2D position = new Vector2D();
   private double radius = 0;
+  private double hue = 0, saturation = 0, brightness = 0;
   
   public SoftBodyShadow(SoftBody softBody) {
     body = softBody;
@@ -41,10 +42,17 @@ public static class SoftBodyShadow {
     try {
       position.set(body.getPosition());
       radius = body.getRadius();
+      hue = body.getHue();
+      saturation = body.getSaturation();
+      brightness = body.getBrightness();
     }
     finally {
       lock.writeLock().unlock();
     }
+  }
+  
+  public int getId() {
+    return body.getId();
   }
   
   public Vector2D getPosition() {
@@ -72,8 +80,16 @@ public static class SoftBodyShadow {
     }
   }
   
-  public int getId() {
-    return body.getId();
+  public double getHue() {
+    return hue;
+  }
+
+  public double getSaturation() {
+    return saturation;
+  }
+
+  public double getBrightness() {
+    return brightness;
   }
   
   public Class getBodyClass() {
@@ -89,17 +105,25 @@ public static class SoftBodyShadow {
   }
   
   private static void recurseLocks(int index, List<SoftBodyShadow> sortedShadows, LockedSoftBodyArrayHandler handler) {
-    if (index > sortedShadows.size()) {
+    if (index < sortedShadows.size()) {
+      // Keep locking intrinsic locks
+      final SoftBodyShadow shadow = sortedShadows.get(index); 
+      synchronized (shadow) {
+        recurseLocks(index + 1, sortedShadows, handler);
+      }
+    } else {
       // Execute handler
       final List<SoftBody> softBodies = new ArrayList<SoftBody>(sortedShadows.size());
       for (SoftBodyShadow shadow : sortedShadows) {
         softBodies.add(shadow.body);
       }
-      handler.handleLockedSoftBodyArray(softBodies);
-    } else {
-      // Keep locking intrinsic locks
-      synchronized (sortedShadows.get(index)) {
-        recurseLocks(index + 1, sortedShadows, handler);
+      try {
+        handler.handleLockedSoftBodyArray(softBodies);
+      }
+      catch (Exception e) {
+        // This is only here, because Processing does not render these errors correctly!
+        System.out.println("Intercepted error in SoftBodyShadow.recurseLocks: " + e.getMessage());
+        e.printStackTrace();
       }
     }
   }

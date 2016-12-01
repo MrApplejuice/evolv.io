@@ -21,11 +21,12 @@ class SoftBody {
   
   protected double energy;
   
+  protected double hue;
+  protected double saturation;
+  protected double brightness;
+  
   float ENERGY_DENSITY; // Set so when a creature is of minimum size, it equals one.
   double density;
-  double hue;
-  double saturation;
-  double brightness;
   double birthTime;
   final float FRICTION = 0.004;
   final float COLLISION_FORCE = 0.01;
@@ -48,14 +49,26 @@ class SoftBody {
     ENERGY_DENSITY = 1.0 / (Board.MINIMUM_SURVIVABLE_SIZE * Board.MINIMUM_SURVIVABLE_SIZE * PI);
   }
 
-  public Vector2D getPosition() {
-    return position;
-  }
-
   public int getId() {
     return id;
   }
   
+  public Vector2D getPosition() {
+    return position;
+  }
+
+  public double getHue() {
+    return hue;
+  }
+
+  public double getSaturation() {
+    return saturation;
+  }
+
+  public double getBrightness() {
+    return brightness;
+  }
+
   public int xBound(int x) {
     return Math.min(Math.max(x, 0), board.getBoardWidth() - 1);
   }
@@ -74,8 +87,8 @@ class SoftBody {
     return Math.min(Math.max(y, radius), board.getBoardHeight() - radius);
   }
 
-  public void collide(double timeStep, List<SoftBody> colliders) {
-    for (final SoftBody collider : colliders) {
+  public void collide(double timeStep, SoftBodyShadow softBodyShadow, List<SoftBodyShadow> colliders) {
+    for (final SoftBodyShadow collider : colliders) {
       double distance = position.distance(collider.getPosition());
       double combinedRadius = getRadius() + collider.getRadius();
       if (distance < combinedRadius) {

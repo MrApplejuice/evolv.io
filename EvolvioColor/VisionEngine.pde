@@ -14,7 +14,7 @@ static class VisionSystem {
   private Vector2D[] visionEndpoints = new Vector2D[visionAngles.length];
   private Vector2D[] visionRangePoints = new Vector2D[visionAngles.length];
   
-  private ArrayList<SoftBody> potentialVisionOccluders = new ArrayList<SoftBody>();
+  private ArrayList<SoftBodyShadow> potentialVisionOccluders = new ArrayList<SoftBodyShadow>();
   
   private double[] visionValues = new double[visionAngles.length * 3];
   
@@ -55,12 +55,12 @@ static class VisionSystem {
         currentTile = linAlgPool.getVector2D().set((int) (origin.getX() + Math.cos(visionTotalAngle) * DAvision),
                                                    (int) (origin.getY() + Math.sin(visionTotalAngle) * DAvision));
         if (!currentTile.equals(prevTile)) {
-          potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(currentTile));
+          potentialVisionOccluders.addAll(board.getSoftBodyShadowsAtPosition(currentTile));
           if ((prevTile != null) && (prevTile.getX() != currentTile.getX()) && (prevTile.getY() != currentTile.getY())) {
             tmpV.set(prevTile.getX(), currentTile.getX());
-            potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(tmpV));
+            potentialVisionOccluders.addAll(board.getSoftBodyShadowsAtPosition(tmpV));
             tmpV.set(currentTile.getX(), prevTile.getX());
-            potentialVisionOccluders.addAll(board.getSoftBodiesAtPosition(tmpV));
+            potentialVisionOccluders.addAll(board.getSoftBodyShadowsAtPosition(tmpV));
           }
         }
         
@@ -74,15 +74,15 @@ static class VisionSystem {
       final Vector2D visionEndTip = linAlgPool.getVector2D().set(visionDistances[k], 0);
       
       
-      for (SoftBody body : potentialVisionOccluders) {
-        if ((ignore != null) && (body.getId() == ignore.getId())) {
+      for (SoftBodyShadow shadow : potentialVisionOccluders) {
+        if ((ignore != null) && (shadow.getId() == ignore.getId())) {
           continue;
         }
         
-        final Vector2D pos = linAlgPool.getVector2D().set(body.getPosition());
+        final Vector2D pos = linAlgPool.getVector2D().set(shadow.getPosition());
         pos.inplaceSub(origin);
         
-        final double radius = body.getRadius();
+        final double radius = shadow.getRadius();
         final Vector2D rotatedPos = unrotateMatrix.dotProduct(pos);
         
         if (Math.abs(rotatedPos.getY()) <= radius) { // Test: Sphere of the other body intersects with the vision beam
@@ -92,9 +92,9 @@ static class VisionSystem {
             // YES! There is an occlussion.
             visionEndTip.set(rotatedPos.getX() - Math.sqrt(radius * radius - rotatedPos.getY() * rotatedPos.getY()), 0);
 
-            visionValues[k * 3] = body.hue;
-            visionValues[k * 3 + 1] = body.saturation;
-            visionValues[k * 3 + 2] = body.brightness;
+            visionValues[k * 3] = shadow.getHue();
+            visionValues[k * 3 + 1] = shadow.getSaturation();
+            visionValues[k * 3 + 2] = shadow.getBrightness();
           }
         }
 

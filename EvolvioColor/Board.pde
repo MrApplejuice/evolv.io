@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Iterator;
 
 public static final List<SoftBody> EMPTY_SOFT_BODY_LIST = new ArrayList<SoftBody>();
+public static final List<SoftBodyShadow> EMPTY_SOFT_BODY_SHADOW_LIST = new ArrayList<SoftBodyShadow>();
 
 /**
   Handler interaface for synchrnozied handling of tile interactions.
@@ -48,9 +49,9 @@ public interface AbstractBoardInterface {
   public boolean interactWithTileAtLocation(Vector2D location, SynchronizedTileInteraction handler);
   
   /**
-    Returns a list of soft bodies at the given grid locations.
+    Returns a list of soft body shadows at the given grid locations.
    */
-  public List<SoftBody> getSoftBodiesAtPosition(Vector2D v);
+  public List<SoftBodyShadow> getSoftBodyShadowsAtPosition(Vector2D v);
 };
 
 interface DrawConfiguration {
@@ -136,11 +137,15 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       while (!Thread.interrupted()) {
         try {
           final Creature me = workDistributor.popCreature();
-          me.see(timeStep);
-          me.metabolize(timeStep, year);
-          me.useBrain(timeStep, !userControl);
-          me.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(me));
-          me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+          synchronized (me) {
+            me.see(timeStep);
+            me.metabolize(timeStep, year);
+            me.useBrain(timeStep, !userControl);
+          }
+          me.collide(timeStep, softBodyShadowLookupField.getSoftBodyShadowFor(me), softBodyShadowLookupField.getCollisionTargetsFor(me));
+          synchronized (me) {
+            me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+          }
         }
         catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -154,9 +159,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     class maintains an internal grid that is aligned with the tile grid. The
     this allows a quicker location-based lookup for (smallish) creatures.
    */
-  private class SoftBodyLookupField {
-    private class SoftBodyPositionAndExtents {
+  private class SoftBodyShadowLookupField {
+    private class SoftBodyShadowPositionAndExtents {
       public SoftBody body;
+      public SoftBodyShadow shadow;
 
       // Statically stored data
       public Vector2D center = new Vector2D();
@@ -164,6 +170,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       public int gridMinX, gridMaxX, gridMinY, gridMaxY;
       
       public void update() {
+        shadow.update();
+        
         center.set(body.getPosition());
         radius = body.getRadius();
         
@@ -173,44 +181,45 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         gridMaxY = Math.min(height - 1, (int) (center.getY() + radius));
       }
       
-      public SoftBodyPositionAndExtents(SoftBody b) {
+      public SoftBodyShadowPositionAndExtents(SoftBody b) {
         body = b;
+        shadow = new SoftBodyShadow(body);
         update();
       }
     };
     
     private int width, height;
     
-    private Map<Integer, SoftBodyPositionAndExtents> softBodyPositionLookup = new HashMap<Integer, SoftBodyPositionAndExtents>();
-    private List<List<List<SoftBody>>> softBodyField; // Woohoo - list-ception because of limits to Java's generics!
+    private Map<Integer, SoftBodyShadowPositionAndExtents> softBodyPositionLookup = new HashMap<Integer, SoftBodyShadowPositionAndExtents>();
+    private List<List<List<SoftBodyShadowPositionAndExtents>>> infoField; // Woohoo - list-ception because of limits to Java's generics!
     
-    public SoftBodyLookupField(int width, int height) {
+    public SoftBodyShadowLookupField(int width, int height) {
       this.width = width;
       this.height = height;
       
-      softBodyField = new ArrayList<List<List<SoftBody>>>(width);
+      infoField = new ArrayList<List<List<SoftBodyShadowPositionAndExtents>>>(width);
       for (int x = 0; x < width; x++) {
-        final List<List<SoftBody>> column = new ArrayList<List<SoftBody>>(height);
-        softBodyField.add(column);
+        final List<List<SoftBodyShadowPositionAndExtents>> column = new ArrayList<List<SoftBodyShadowPositionAndExtents>>(height);
+        infoField.add(column);
         
         for (int y = 0; y < height; y++) {
-          column.add(new ArrayList<SoftBody>());
+          column.add(new ArrayList<SoftBodyShadowPositionAndExtents>());
         }
       }
     }
     
-    private void removeFromField(SoftBodyPositionAndExtents sbExt) {
+    private void removeFromField(SoftBodyShadowPositionAndExtents sbExt) {
       for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
         for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
-          softBodyField.get(x).get(y).remove(sbExt.body);
+          infoField.get(x).get(y).remove(sbExt);
         }
       }
     }
     
     public void addOrUpdate(SoftBody b) {
-      SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.get(b.getId());
+      SoftBodyShadowPositionAndExtents sbExt = softBodyPositionLookup.get(b.getId());
       if (sbExt == null) {
-        sbExt = new SoftBodyPositionAndExtents(b);
+        sbExt = new SoftBodyShadowPositionAndExtents(b);
         softBodyPositionLookup.put(b.getId(), sbExt);
       } else {
         removeFromField(sbExt);
@@ -219,13 +228,22 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       
       for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
         for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
-          softBodyField.get(x).get(y).add(b);
+          infoField.get(x).get(y).add(sbExt);
         }
       }
     }
     
+    public SoftBodyShadow getSoftBodyShadowFor(SoftBody body) {
+      SoftBodyShadowPositionAndExtents sbExt = softBodyPositionLookup.get(body.getId());
+      if (sbExt == null) {
+        return null;
+      } else {
+        return sbExt.shadow;
+      }
+    }
+    
     public void remove(SoftBody b) {
-      SoftBodyPositionAndExtents sbExt = softBodyPositionLookup.remove(b.getId());
+      SoftBodyShadowPositionAndExtents sbExt = softBodyPositionLookup.remove(b.getId());
       if (sbExt != null) {
         removeFromField(sbExt);
       }
@@ -235,20 +253,42 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       final int x = (int) pos.getX();
       final int y = (int) pos.getY();
       
+      
       if (x >= 0 && x < width && y >= 0 && y < height) {
-        return softBodyField.get(x).get(y);
+        final List<SoftBodyShadowPositionAndExtents> fieldInfo = infoField.get(x).get(y);
+        final List<SoftBody> result = new ArrayList<SoftBody>(fieldInfo.size());
+        for (final SoftBodyShadowPositionAndExtents sbsi : fieldInfo) {
+          result.add(sbsi.body);
+        }
+        return result;
       }
       return EMPTY_SOFT_BODY_LIST;
     }
     
-    public List<SoftBody> getCollisionTargetsFor(SoftBody body) {
-      SoftBodyPositionAndExtents sbExt = new SoftBodyPositionAndExtents(body);
+    public List<SoftBodyShadow> getShadowsAt(Vector2D pos) {
+      final int x = (int) pos.getX();
+      final int y = (int) pos.getY();
       
-      final List<SoftBody> result = new ArrayList<SoftBody>();
+      
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        final List<SoftBodyShadowPositionAndExtents> fieldInfo = infoField.get(x).get(y);
+        final List<SoftBodyShadow> result = new ArrayList<SoftBodyShadow>(fieldInfo.size());
+        for (final SoftBodyShadowPositionAndExtents sbsi : fieldInfo) {
+          result.add(sbsi.shadow);
+        }
+        return result;
+      }
+      return EMPTY_SOFT_BODY_SHADOW_LIST;
+    }
+    
+    public List<SoftBodyShadow> getCollisionTargetsFor(SoftBody body) {
+      SoftBodyShadowPositionAndExtents sbExt = new SoftBodyShadowPositionAndExtents(body);
+      
+      final List<SoftBodyShadow> result = new ArrayList<SoftBodyShadow>();
       final Vector2D pos = new Vector2D();
       for (int x = sbExt.gridMinX; x <= sbExt.gridMaxX; x++) {
         for (int y = sbExt.gridMinY; y <= sbExt.gridMaxY; y++) {
-          for (SoftBody candidate : getBodiesAt(pos.set(x, y))) {
+          for (SoftBodyShadow candidate : getShadowsAt(pos.set(x, y))) {
             if (candidate.getId() != body.getId()) {
               if (!result.contains(candidate)) {
                 result.add(candidate);
@@ -276,7 +316,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private int boardHeight;
   
   private Tile[][] tiles;
-  private SoftBodyLookupField softBodyCloneLookupField;
+  private SoftBodyShadowLookupField softBodyShadowLookupField;
 
   // Creature
   int creatureMinimum;
@@ -362,7 +402,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     MIN_TEMPERATURE = min;
     MAX_TEMPERATURE = max;
 
-    softBodyCloneLookupField = new SoftBodyLookupField(boardWidth, boardHeight);
+    softBodyShadowLookupField = new SoftBodyShadowLookupField(boardWidth, boardHeight);
 
     ROCKS_TO_ADD = rta;
     rocks = new ArrayList<SoftBody>(0);
@@ -370,7 +410,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       SoftBody newRock = new SoftBody(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
         getRandomSize(), ROCK_DENSITY, hue(ROCK_COLOR), saturation(ROCK_COLOR), brightness(ROCK_COLOR), this, year);
       rocks.add(newRock);
-      softBodyCloneLookupField.addOrUpdate(newRock.getUpdatedStaticClone());
+      softBodyShadowLookupField.addOrUpdate(newRock.getUpdatedStaticClone());
     }
 
     creatureMinimum = cm;
@@ -460,10 +500,17 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
   
   @Override
-  public List<SoftBody> getSoftBodiesAtPosition(Vector2D v) {
-    return softBodyCloneLookupField.getBodiesAt(v);
+  public List<SoftBodyShadow> getSoftBodyShadowsAtPosition(Vector2D v) {
+    return softBodyShadowLookupField.getShadowsAt(v);
   }
   
+  /**
+    Only to be accessed in synchronous mode!!!
+   */
+  public List<SoftBody> getSoftBodiesAtPosition(Vector2D v) {
+    return softBodyShadowLookupField.getBodiesAt(v);
+  }
+    
   public synchronized void drawBoard(float scaleUp, float camZoom, int mX, int mY) {
     for (int x = 0; x < boardWidth; x++) {
       for (int y = 0; y < boardHeight; y++) {
@@ -624,7 +671,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       text("(" + toAge(selectedCreature.birthTime) + ")", 10, linePos); linePos += 25;
       text("Generation: " + selectedCreature.gen, 10, linePos); linePos += 25;
       text("Parents: " + selectedCreature.parents, 10, linePos, 210, 255); linePos += 25 * 2;
-      text("Hue: " + nf((float)(selectedCreature.hue), 0, 2), 10, linePos, 210, 255); linePos += 25;
+      text("Hue: " + nf((float)(selectedCreature.getHue()), 0, 2), 10, linePos, 210, 255); linePos += 25;
       text("Mouth hue: " + nf((float)(selectedCreature.mouthHue), 0, 2), 10, linePos, 210, 255); linePos += 25;
 
       if (userControl) {
@@ -763,8 +810,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
             if (key == ' ') selectedCreature.eat(0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
             if (key == 'v' || key == 'V') selectedCreature.eat(-0.1, timeStep * OBJECT_TIMESTEPS_PER_YEAR);
             if (key == 'f' || key == 'F') selectedCreature.fight(0.5);
-            if (key == 'u' || key == 'U') selectedCreature.setHue(selectedCreature.hue + 0.02);
-            if (key == 'j' || key == 'J') selectedCreature.setHue(selectedCreature.hue - 0.02);
+            if (key == 'u' || key == 'U') selectedCreature.setHue(selectedCreature.getHue() + 0.02);
+            if (key == 'j' || key == 'J') selectedCreature.setHue(selectedCreature.getHue() - 0.02);
 
             if (key == 'i' || key == 'I') selectedCreature.setMouthHue(selectedCreature.mouthHue + 0.02);
             if (key == 'k' || key == 'K') selectedCreature.setMouthHue(selectedCreature.mouthHue - 0.02);
@@ -785,7 +832,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         if (creature != selectedCreature) {
           creature.see(timeStep);
         }
-        creature.collide(timeStep, softBodyCloneLookupField.getCollisionTargetsFor(creature));
+        creature.collide(timeStep, softBodyShadowLookupField.getSoftBodyShadowFor(creature), softBodyShadowLookupField.getCollisionTargetsFor(creature));
         creature.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
       }
       
@@ -812,15 +859,15 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           }
           
           me.returnToEarth();
-          softBodyCloneLookupField.remove(me.getUpdatedStaticClone());
+          softBodyShadowLookupField.remove(me.getUpdatedStaticClone());
           creatureIterator.remove();
         } else {
-          softBodyCloneLookupField.addOrUpdate(me.getUpdatedStaticClone());
+          softBodyShadowLookupField.addOrUpdate(me.getUpdatedStaticClone());
         }
       }
       for (final SoftBody rock : rocks) {
         rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-        softBodyCloneLookupField.addOrUpdate(rock.getUpdatedStaticClone());
+        softBodyShadowLookupField.addOrUpdate(rock.getUpdatedStaticClone());
       }
       //iterationEndRemoveLoopSW.lap();
       
@@ -932,7 +979,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private synchronized void mergeNewCreaturePool() {
     this.creatures.addAll(this.newCreatures);
     for (final Creature c : this.newCreatures) {
-      softBodyCloneLookupField.addOrUpdate(c.getUpdatedStaticClone());
+      softBodyShadowLookupField.addOrUpdate(c.getUpdatedStaticClone());
     }
     this.newCreatures.clear();
   }
@@ -943,7 +990,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         final Creature c = getRandomCreature();
         c.addEnergy(Creature.SAFE_SIZE);
         c.reproduce(Creature.SAFE_SIZE);
-        c.collide(0, softBodyCloneLookupField.getCollisionTargetsFor(c));
+        c.collide(0, softBodyShadowLookupField.getSoftBodyShadowFor(c), softBodyShadowLookupField.getCollisionTargetsFor(c));
       } else {
         Creature newCreature = new Creature(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
           random(MIN_CREATURE_ENERGY, MAX_CREATURE_ENERGY), 1, random(0, 1), 1, 1, 

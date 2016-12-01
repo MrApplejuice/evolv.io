@@ -193,15 +193,27 @@ class Creature extends SoftBody implements OrientedBody {
   }
  //<>//
   @Override //<>//
-  public void collide(double timeStep, List<SoftBody> colliders) {
-    super.collide(timeStep, colliders);
+  public void collide(final double timeStep, final SoftBodyShadow softBodyShadow, final List<SoftBodyShadow> colliders) {
+    super.collide(timeStep, softBodyShadow, colliders);
     
+    colliders.add(softBodyShadow);
     if (plannedReproductionValue > 0) {
-      doReproduce(colliders, plannedReproductionValue);
+      SoftBodyShadow.lockListOfSoftBodies(colliders, new SoftBodyShadow.LockedSoftBodyArrayHandler() {
+        @Override
+        public void handleLockedSoftBodyArray(List<SoftBody> lockedBodies) {
+          doReproduce(lockedBodies, plannedReproductionValue);
+        }
+      });
+      
       plannedReproductionValue = 0;
     }
     if (plannedFightValue > 0) {
-      doFight(colliders, plannedFightValue, timeStep);
+      SoftBodyShadow.lockListOfSoftBodies(colliders, new SoftBodyShadow.LockedSoftBodyArrayHandler() {
+        @Override
+        public void handleLockedSoftBodyArray(List<SoftBody> lockedBodies) {
+          doFight(lockedBodies, plannedFightValue, timeStep);
+        }
+      });
       plannedFightValue = 0;
     }
   }
@@ -275,12 +287,14 @@ class Creature extends SoftBody implements OrientedBody {
       fightLevel = amount * 100; // 100 copied from useBrain - kinda random?
       loseEnergy(fightLevel * FIGHT_ENERGY * energy * timeStep);
       for (final SoftBody collider : colliders) {
-        if (Creature.class.isInstance(collider)) {
-          final Creature colliderCreature = Creature.class.cast(collider);
-          final double distance = position.distance(colliderCreature.getPosition());
-          final double combinedRadius = getRadius() * FIGHT_RANGE + collider.getRadius();
-          if (distance < combinedRadius) {
-            colliderCreature.dropEnergy(fightLevel * INJURED_ENERGY * timeStep);
+        if (collider.getId() != getId()) {
+          if (Creature.class.isInstance(collider)) {
+            final Creature colliderCreature = Creature.class.cast(collider);
+            final double distance = position.distance(colliderCreature.getPosition());
+            final double combinedRadius = getRadius() * FIGHT_RANGE + collider.getRadius();
+            if (distance < combinedRadius) {
+              colliderCreature.dropEnergy(fightLevel * INJURED_ENERGY * timeStep);
+            }
           }
         }
       }
@@ -352,20 +366,23 @@ class Creature extends SoftBody implements OrientedBody {
     if (babySize >= 0) {
       parentsList.clear();
       parentsList.add(this);
+      
       double availableEnergy = getBabyEnergy();
-      for (final SoftBody possibleParentBody : colliders) {
-        if (Creature.class.isInstance(possibleParentBody)) {
-          final Creature possibleParent = Creature.class.cast(possibleParentBody);
-          if (possibleParent.brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
+      for (final SoftBody possibleParent : colliders) {
+        if (Creature.class.isInstance(possibleParent)) {
+          final Creature possibleParentCreature = Creature.class.cast(possibleParent);
+          if (possibleParentCreature.brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
             final double distance = position.distance(possibleParent.getPosition());
             double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
             if (distance < combinedRadius) {
-              parentsList.add(possibleParent);
-              availableEnergy += possibleParent.getBabyEnergy();
+              parentsList.add(possibleParentCreature);
+              availableEnergy += possibleParentCreature.getBabyEnergy();
             }
           }
         }
       }
+      
+      
       if (availableEnergy > babySize) {
         final Vector2D newPosition = softBodyLinAlgPool.getVector2D();
         final Vector2D newVelocity = softBodyLinAlgPool.getVector2D();

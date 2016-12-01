@@ -28,8 +28,8 @@ boolean draggedFar = false;
 final String INITIAL_FILE_NAME = "PIC";
 void settings() {
   // Get users window size
-  windowWidth = displayWidth;
-  windowHeight = displayHeight;
+  windowWidth = 1600;
+  windowHeight = 900;
 
   // Set scaling to be custom to current users screen size
   scaleFactor = ((float)windowHeight)/BOARD_HEIGHT/SCALE_TO_FIX_BUG;

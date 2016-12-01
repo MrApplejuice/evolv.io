@@ -100,9 +100,14 @@ class SoftBody {
 
   public void applyMotions(double timeStep) {
     final Vector2D movement = softBodyLinAlgPool.getVector2D();
+    
     movement.set(velocity).inplaceMul(timeStep);
     position.inplaceAdd(movement);
     velocity.inplaceMul(Math.max(0, 1 - FRICTION / getMass()));
+    
+    position.set(Math.max(0, Math.min(board.getBoardWidth(), position.getX())),
+                 Math.max(0, Math.min(board.getBoardHeight(), position.getY())));
+    
     softBodyLinAlgPool.recycle(movement);
   }
 
@@ -125,31 +130,5 @@ class SoftBody {
 
   public double getMass() {
     return energy / ENERGY_DENSITY * density;
-  }
-  
-  /**
-    This is a specialized function that copies the state of the current object into an internally 
-    referenced static clone. This is done to copy the state so that all soft bodies can be updated 
-    independently from each other - finally! 
-   */
-  private SoftBody theClone = null;
-  public SoftBody getUpdatedStaticClone() {
-   if (theClone == null) {
-      theClone = new SoftBody(id, position, velocity, energy, density, hue, saturation, brightness, board, birthTime);
-    } else {
-      updateStaticCloneSoftBody(theClone);
-    }
-    return theClone;
-  }
-  
-  protected void updateStaticCloneSoftBody(SoftBody theClone) {
-    theClone.position.set(position);
-    theClone.velocity.set(velocity);
-    theClone.energy = energy;
-    theClone.density = density; 
-    theClone.hue = hue; 
-    theClone.saturation = saturation; 
-    theClone.brightness = brightness; 
-    theClone.ENERGY_DENSITY = ENERGY_DENSITY;
   }
 }

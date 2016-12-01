@@ -410,7 +410,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       SoftBody newRock = new SoftBody(generateUniqueId(), new Vector2D().set(random(0, boardWidth), random(0, boardHeight)), new Vector2D(), 
         getRandomSize(), ROCK_DENSITY, hue(ROCK_COLOR), saturation(ROCK_COLOR), brightness(ROCK_COLOR), this, year);
       rocks.add(newRock);
-      softBodyShadowLookupField.addOrUpdate(newRock.getUpdatedStaticClone());
+      softBodyShadowLookupField.addOrUpdate(newRock);
     }
 
     creatureMinimum = cm;
@@ -859,15 +859,15 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
           }
           
           me.returnToEarth();
-          softBodyShadowLookupField.remove(me.getUpdatedStaticClone());
+          softBodyShadowLookupField.remove(me);
           creatureIterator.remove();
         } else {
-          softBodyShadowLookupField.addOrUpdate(me.getUpdatedStaticClone());
+          softBodyShadowLookupField.addOrUpdate(me);
         }
       }
       for (final SoftBody rock : rocks) {
         rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
-        softBodyShadowLookupField.addOrUpdate(rock.getUpdatedStaticClone());
+        softBodyShadowLookupField.addOrUpdate(rock);
       }
       //iterationEndRemoveLoopSW.lap();
       
@@ -979,7 +979,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   private synchronized void mergeNewCreaturePool() {
     this.creatures.addAll(this.newCreatures);
     for (final Creature c : this.newCreatures) {
-      softBodyShadowLookupField.addOrUpdate(c.getUpdatedStaticClone());
+      softBodyShadowLookupField.addOrUpdate(c);
     }
     this.newCreatures.clear();
   }

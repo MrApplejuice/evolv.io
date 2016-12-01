@@ -347,9 +347,11 @@ void mouseReleased() {
         final Vector2D worldClickCoordinate = new Vector2D().set(toWorldXCoordinate(mouseX, mouseY), toWorldYCoordinate(mouseX, mouseY));
         evoBoard.unselect();
         cameraR = 0;
+        System.out.println(worldClickCoordinate);
         for (final SoftBody body : evoBoard.getSoftBodiesAtPosition(worldClickCoordinate)) { 
           if (Creature.class.isInstance(body)) {
             final Creature creature = Creature.class.cast(body);
+            System.out.println(creature.getPosition().distance(worldClickCoordinate));
             if (creature.getPosition().distance(worldClickCoordinate) <= creature.getRadius()) {
               evoBoard.selectedCreature = creature;
               zoom = 16;

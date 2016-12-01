@@ -215,6 +215,8 @@ class Creature extends SoftBody implements OrientedBody {
         }
       });
       plannedFightValue = 0;
+    } else {
+      fightLevel = 0;
     }
   }
   

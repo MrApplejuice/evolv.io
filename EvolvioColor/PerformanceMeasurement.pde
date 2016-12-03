@@ -207,7 +207,7 @@ public static class PerformanceMeasurer {
         metricValues.add(null);
       }
       
-      metricValues.set(xindex, ms);
+      metricValues.set(xindex - leftOffset, ms);
     }
     
     public void update() {
@@ -231,7 +231,7 @@ public static class PerformanceMeasurer {
         globallyUpdateMaxValue();
       }
       
-      xAxis.setRange(0, maxCycle);
+      xAxis.setRange(leftOffset, maxCycle);
       yAxis.setRange(0, Math.pow(2, Math.ceil(Math.log(maxValue) / Math.log(2.0d))));
       chart.getChart().fireChartChanged();
       chart.invalidate();

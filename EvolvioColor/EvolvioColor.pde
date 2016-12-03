@@ -190,7 +190,7 @@ void mousePressed() {
           break;
 
           case(7):
-          // Code for the eighth button
+            evoBoard.showPerformanceWindow();
           break;
         }
       }

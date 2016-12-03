@@ -1,6 +1,8 @@
 import java.io.*;
 
 class Board {
+  private PerformanceMeasurer performanceMeasurer = new PerformanceMeasurer();
+  
   // Board
   int boardWidth;
   int boardHeight;
@@ -223,7 +225,7 @@ class Board {
       String[] buttonTexts = {"Brain Control", "Maintain pop. at " + creatureMinimum,
         "Screenshot now", "-   Image every " + nf((float)imageSaveInterval, 0, 2) + " years   +",
         "Text file now", "-    Text every " + nf((float)textSaveInterval, 0, 2) + " years    +",
-        "-    Play Speed (" + playSpeed + "x)    +", "This button does nothing"};
+        "-    Play Speed (" + playSpeed + "x)    +", "Show performance measurer"};
       if (userControl) {
         buttonTexts[0] = "Keyboard Control";
       }
@@ -588,5 +590,9 @@ class Board {
 
   public void unselect() {
     selectedCreature = null;
+  }
+  
+  public void showPerformanceWindow() {
+    performanceMeasurer.show();
   }
 }

@@ -48,9 +48,12 @@ void setup() {
 }
 
 void draw() {
+  evoBoard.boardSimulationCycleSW.start();
   for (int iteration = 0; iteration < evoBoard.playSpeed; iteration++) {
     evoBoard.iterate(TIME_STEP);
   }
+  evoBoard.boardSimulationCycleSW.lap();
+  
   if (dist(prevMouseX, prevMouseY, mouseX, mouseY) > 5) {
     draggedFar = true;
   }

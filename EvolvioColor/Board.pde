@@ -2,7 +2,7 @@ import java.io.*;
 
 class Board {
   private PerformanceMeasurer performanceMeasurer = new PerformanceMeasurer();
-  private LoggerStopWatch boardSimulationCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "simulation"));
+  public final LoggerStopWatch boardSimulationCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "simulation"));
   private LoggerStopWatch boardDrawingCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "draw"));
   
   // Board
@@ -345,8 +345,6 @@ class Board {
   }
 
   public void iterate(double timeStep) {
-    boardSimulationCycleSW.start();
-    
     double prevYear = year;
     year += timeStep;
     if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
@@ -418,8 +416,6 @@ class Board {
       }
     }
     finishIterate(timeStep);
-
-    boardSimulationCycleSW.lap();
   }
 
   public void finishIterate(double timeStep) {

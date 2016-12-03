@@ -131,6 +131,12 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   };
   
   private class CreatureWorkerThread extends Thread {
+    private LoggerStopWatch creatureSeeCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Creature", "see"));
+    private LoggerStopWatch creatureMetabolizeCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Creature", "metabolize"));
+    private LoggerStopWatch creatureUseBrainCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Creature", "useBrain"));
+    private LoggerStopWatch creatureCollideCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Creature", "collide"));
+    private LoggerStopWatch creatureApplyMotionsCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Creature", "applyMotions"));
+
     private WorkDistributor workDistributor;
     
     public CreatureWorkerThread(WorkDistributor workDistributor) {
@@ -142,13 +148,27 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         try {
           final Creature me = workDistributor.popCreature();
           synchronized (me) {
+            creatureSeeCycleSW.start();
             me.see(timeStep);
+            creatureSeeCycleSW.lap();
+            
+            creatureMetabolizeCycleSW.start();
             me.metabolize(timeStep, year);
+            creatureMetabolizeCycleSW.lap();
+            
+            creatureUseBrainCycleSW.start();
             me.useBrain(timeStep, !userControl);
+            creatureUseBrainCycleSW.lap();
           }
+          
+          creatureCollideCycleSW.start();
           me.collide(timeStep, softBodyShadowLookupField.getSoftBodyShadowFor(me), softBodyShadowLookupField.getCollisionTargetsFor(me));
+          creatureCollideCycleSW.lap();
+          
           synchronized (me) {
+            creatureApplyMotionsCycleSW.start();
             me.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
+            creatureApplyMotionsCycleSW.lap();
           }
         }
         catch (InterruptedException e) {

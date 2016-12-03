@@ -17,3 +17,10 @@ evolv\.io uses a neural net and evolution in order to simulate creatures evolvin
 2. Download [Processing](https://www.processing.org) version 3.2.1
 3. Click `File > Open` and open [EvolvioColor/EvolvioColor.pde](EvolvioColor/EvolvioColor.pde).
 4. Click `Play`.
+
+
+# External libraries
+
+The project includes the binaries for JFreeChart, licensed under the LGPL. The sources and binaries cna be found here:
+  
+ - https://sourceforge.net/projects/jfreechart/

@@ -34,7 +34,7 @@ public static class LoggerStopWatch {
   }
   
   public void lap() {
-    int time = (int) ((System.nanoTime() - startTime) / 1000000L);
+    double time = (System.nanoTime() - startTime) / 1000000.0d;
     logger.logMetric(time);
   }
 }
@@ -55,7 +55,7 @@ public static class AverageLogger {
     }
   }
   
-  public void logMetric(int number) {
+  public void logMetric(double ms) {
     int i;
     synchronized (this) {
       i = rotatingLoggerIndex++;
@@ -65,27 +65,27 @@ public static class AverageLogger {
     }
     
     synchronized (loggers[i]) {
-      loggers[i].add(new Integer(number));
+      loggers[i].add(new Double(ms));
     }
   }
   
   /**
     Obtains the averaged recorded values and removes all recorded data.
    */
-  public synchronized int cycleData() {
-    return calculateAveragedDataAndPurge(0, 0, 0);
+  public synchronized double cycleData() {
+    return calculateAveragedDataAndPurge(0, 0.0d, 0);
   }
   
-  private synchronized int calculateAveragedDataAndPurge(int i, long runningSum, int count) {
+  private synchronized double calculateAveragedDataAndPurge(int i, double runningSum, int count) {
     if (i >= ROTATING_LOGGER_COUNT) {
       if (count == 0) {
         return 0;
       }
-      return (int) (runningSum / count);
+      return runningSum / count;
     } else {
       synchronized (loggers[i]) {
         for (final Object o : loggers[i]) {
-          runningSum += (Integer) o;
+          runningSum += (Double) o;
         }
         count += loggers[i].size();
         loggers[i].clear();
@@ -101,6 +101,8 @@ public static class AverageLogger {
   and if unsuccesful, fails silently.
  */
 public static class PerformanceMeasurer {
+  public static final int MAX_SAMPLE_COUNT = 200;
+  
   private static class GroupChart {
     private XYDataset xydataset = new AbstractXYDataset() {
       @Override
@@ -304,7 +306,7 @@ public static class PerformanceMeasurer {
           @Override
           public void run() {
             for (final Map.Entry<String, AverageLogger> metricLoggerEntry : groupNameMetricMapEntry.getValue().entrySet()) {
-              int timeValue = metricLoggerEntry.getValue().cycleData();
+              double timeValue = metricLoggerEntry.getValue().cycleData();
               gchart.log(metricLoggerEntry.getKey(), cycleCounter, timeValue);
             }
             gchart.update();

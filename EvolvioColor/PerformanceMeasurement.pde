@@ -133,7 +133,7 @@ public static class PerformanceMeasurer {
           xindex++;
           if (i != null) {
             if (item == 0) {
-              return xindex;
+              return leftOffset + xindex;
             }
             item--;
           }
@@ -159,6 +159,7 @@ public static class PerformanceMeasurer {
     private NumberAxis xAxis, yAxis;
     private ChartPanel chart;
     
+    private int leftOffset = 0;
     private int maxCycle = 0;
     private double maxValue = 0;
     
@@ -177,6 +178,17 @@ public static class PerformanceMeasurer {
     public ChartPanel getChart() {
       return chart;
     }
+
+    private void globallyUpdateMaxValue() {
+      maxValue = 0;
+      for (List<Double> valueList : values) {
+        for (Double d : valueList) {
+          if (d != null) {
+            maxValue = Math.max(d, maxValue);
+          }
+        }
+      }
+    }
     
     public void log(String metricName, int xindex, double ms) {
       maxCycle = Math.max(maxCycle, xindex);
@@ -191,7 +203,7 @@ public static class PerformanceMeasurer {
         metricValues = values.get(metricNames.indexOf(metricName));
       }
       
-      while (xindex >= metricValues.size()) {
+      while (xindex - leftOffset >= metricValues.size()) {
         metricValues.add(null);
       }
       
@@ -199,6 +211,26 @@ public static class PerformanceMeasurer {
     }
     
     public void update() {
+      boolean removedMaxValue = false;
+      int maxRemovedCount = 0;
+      for (List<Double> valueList : values) {
+        int removedCount = 0;
+        while (valueList.size() > MAX_SAMPLE_COUNT) {
+          Double value = valueList.remove(0);
+          removedCount++;
+          if (value != null) {
+            if (value == maxValue) {
+              removedMaxValue = true;
+            }
+          }
+        }
+        maxRemovedCount = Math.max(maxRemovedCount, removedCount);
+      }
+      leftOffset += maxRemovedCount;
+      if (removedMaxValue) {
+        globallyUpdateMaxValue();
+      }
+      
       xAxis.setRange(0, maxCycle);
       yAxis.setRange(0, Math.pow(2, Math.ceil(Math.log(maxValue) / Math.log(2.0d))));
       chart.getChart().fireChartChanged();

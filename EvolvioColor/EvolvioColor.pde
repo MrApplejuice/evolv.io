@@ -73,9 +73,7 @@ class SimThread extends Thread {
      Waits for a simulation cycle to end and then returns
      control to the main program.
    */
-  private StopWatch syncWaitDuration = new StopWatch("Sync duration");
   public synchronized void sync() {
-    syncWaitDuration.start();
     try {
       if (freeRunCounter >= 0) {
         while ((freeRunCounter > 0) && (!threadIsLockedUp)) {
@@ -86,7 +84,6 @@ class SimThread extends Thread {
     catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    //syncWaitDuration.lap();
   }
   
   public synchronized void startNextCycle() {
@@ -96,21 +93,19 @@ class SimThread extends Thread {
     }
   }
   
-  private StopWatch simulationDuration = new StopWatch("Sim duration");
   public void run() {
     while (!Thread.interrupted()) {
-      simulationDuration.start();
       if (freeRunCounter > 0) {
         evoBoard.iterate(TIME_STEP);
         freeRunCounter -= 1;
       }
-      //simulationDuration.lap();
       
       synchronized(this) {
         this.notifyAll();
         
         if (freeRunCounter == 0) {
           threadIsLockedUp = true;
+          evoBoard.boardSimulationCycleSW.lap();
           try {
             this.wait();
           }
@@ -118,6 +113,8 @@ class SimThread extends Thread {
             Thread.currentThread().interrupt();
             return;
           }
+          evoBoard.boardSimulationCycleSW.start();
+          
           freeRunCounter = freeRunMode;
           threadIsLockedUp = false;
         }
@@ -163,9 +160,7 @@ void draw() {
   }
 
   synchronized (simThread) {
-    evoBoard.boardSimulationCycleSW.start();
     simThread.sync();
-    evoBoard.boardSimulationCycleSW.lap();
     
     synchronized (evoBoard) {
       if (dragging == 1) {

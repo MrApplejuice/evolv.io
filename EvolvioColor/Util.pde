@@ -13,27 +13,6 @@ static class SettableDouble {
 };
  
  
- /**
-   Helper to time howe long certain operations take.
-  */
-static class StopWatch {
-  private String name;
-  private long lastStartTime = System.nanoTime();
-  
-  public StopWatch(String name) {
-    this.name = name;
-  }
-  
-  public void start() {
-    lastStartTime = System.nanoTime();
-  }
-
-  public void lap() {
-    System.out.println("" + name + ":" + (System.nanoTime() - lastStartTime) + " ns");
-  }
-};
- 
- 
 static class Vector2D {
   private double[] components = {0, 0};
   

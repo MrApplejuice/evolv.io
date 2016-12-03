@@ -751,13 +751,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
 
   private boolean isIterating = false;
-  private StopWatch iterationStartSW = new StopWatch("iteration start");
-  private StopWatch iterationSimSW = new StopWatch("iteration simulation");
-  private StopWatch iterationEndSW = new StopWatch("iteration end");
-  
-  private StopWatch iterationEndRemoveLoopSW = new StopWatch("iteration end remove loop");
   public void iterate(double timeStep) {
-    iterationStartSW.start();
     
     synchronized (this) {
       try {
@@ -805,9 +799,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       mergeNewCreaturePool();
       maintainCreatureMinimum(false);
     }
-    //iterationStartSW.lap();
     
-    iterationSimSW.start();
     if (userControl) {
       if (selectedCreature != null) {
         if (keyPressed) {
@@ -854,12 +846,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     } else {
       workDistributor.cycle();
     }
-    //iterationSimSW.lap();
 
-    iterationEndSW.start();
     synchronized (this) {
-      iterationEndRemoveLoopSW.start();
-      
       final Iterator<Creature> creatureIterator = creatures.iterator(); 
       while (creatureIterator.hasNext()) {
         final Creature me = creatureIterator.next();
@@ -879,13 +867,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
         rock.applyMotions(timeStep * OBJECT_TIMESTEPS_PER_YEAR);
         softBodyShadowLookupField.addOrUpdate(rock);
       }
-      //iterationEndRemoveLoopSW.lap();
       
       isIterating = false;
       notify();
     }
-
-    //iterationEndSW.lap();
   }
 
   private double getGrowthRate(double theTime) {

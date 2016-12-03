@@ -9,6 +9,30 @@ import java.awt.Dimension;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 
+import org.jfree.chart.JFreeChart;
+
+/**
+   Helper to generate timing information for a AverageLogger. Not
+   thread safe!
+ */
+public static class LoggerStopWatch {
+  private AverageLogger logger;
+  private long startTime = System.nanoTime(); 
+  
+  public LoggerStopWatch(AverageLogger logger) {
+    this.logger = logger;
+  }
+  
+  public void start() {
+    startTime = System.nanoTime();
+  }
+  
+  public void lap() {
+    int time = (int) (System.nanoTime() - startTime);
+    logger.logMetric(time);
+  }
+}
+
 /**
   Utility class that is used by the perforamce measurer to do
   efficient and thread safe measurements of metrics.
@@ -29,6 +53,9 @@ public static class AverageLogger {
     int i;
     synchronized (this) {
       i = rotatingLoggerIndex++;
+      if (rotatingLoggerIndex >= ROTATING_LOGGER_COUNT) {
+        rotatingLoggerIndex = 0;
+      }
     }
     
     synchronized (loggers[i]) {

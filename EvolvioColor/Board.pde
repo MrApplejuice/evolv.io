@@ -2,6 +2,8 @@ import java.io.*;
 
 class Board {
   private PerformanceMeasurer performanceMeasurer = new PerformanceMeasurer();
+  private LoggerStopWatch boardSimulationCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "simulation"));
+  private LoggerStopWatch boardDrawingCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "draw"));
   
   // Board
   int boardWidth;
@@ -138,6 +140,8 @@ class Board {
   }
 
   public void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
+    boardDrawingCycleSW.start();
+    
     fill(0, 0, 0);
     noStroke();
     rect(x1, y1, x2 - x1, y2 - y1);
@@ -309,6 +313,8 @@ class Board {
     if (selectedCreature != null) {
       drawCreature(selectedCreature, x1 + 65, y1 + 147, 2.3, scaleUp);
     }
+
+    boardDrawingCycleSW.lap();
   }
 
   void drawPopulationGraph(float x1, float x2, float y1, float y2) {
@@ -337,6 +343,8 @@ class Board {
   }
 
   public void iterate(double timeStep) {
+    boardSimulationCycleSW.start();
+    
     double prevYear = year;
     year += timeStep;
     if (Math.floor(year / recordPopulationEvery) != Math.floor(prevYear / recordPopulationEvery)) {
@@ -408,6 +416,8 @@ class Board {
       }
     }
     finishIterate(timeStep);
+
+    boardSimulationCycleSW.lap();
   }
 
   public void finishIterate(double timeStep) {

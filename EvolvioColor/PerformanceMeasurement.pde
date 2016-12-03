@@ -332,25 +332,17 @@ public static class PerformanceMeasurer {
     cycleCounter++;
     
     for (final Map.Entry<String, Map<String, AverageLogger>> groupNameMetricMapEntry : loggerMap.entrySet()) {
-      try {
-        final GroupChart gchart = getGroupChartForGroup(groupNameMetricMapEntry.getKey());
-        SwingUtilities.invokeAndWait(new Runnable() {
-          @Override
-          public void run() {
-            for (final Map.Entry<String, AverageLogger> metricLoggerEntry : groupNameMetricMapEntry.getValue().entrySet()) {
-              double timeValue = metricLoggerEntry.getValue().cycleData();
-              gchart.log(metricLoggerEntry.getKey(), cycleCounter, timeValue);
-            }
-            gchart.update();
+      final GroupChart gchart = getGroupChartForGroup(groupNameMetricMapEntry.getKey());
+      SwingUtilities.invokeLater(new Runnable() {
+        @Override
+        public void run() {
+          for (final Map.Entry<String, AverageLogger> metricLoggerEntry : groupNameMetricMapEntry.getValue().entrySet()) {
+            double timeValue = metricLoggerEntry.getValue().cycleData();
+            gchart.log(metricLoggerEntry.getKey(), cycleCounter, timeValue);
           }
-        });
-      }
-      catch (InvocationTargetException e) {
-        e.printStackTrace();
-      }
-      catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+          gchart.update();
+        }
+      });
     }
   }
   

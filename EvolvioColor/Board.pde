@@ -68,6 +68,10 @@ interface DrawConfiguration {
   In the future the UI elements should als obe stripped from this class...
  */
 class Board implements AbstractBoardInterface, DrawConfiguration {
+  private PerformanceMeasurer performanceMeasurer = new PerformanceMeasurer();
+  public final LoggerStopWatch boardSimulationCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "simulation"));
+  private LoggerStopWatch boardDrawingCycleSW = new LoggerStopWatch(performanceMeasurer.getLogger("Board", "draw"));
+  
   /**
     Class distributing the simulation of creatures among different
     worker threads.
@@ -531,6 +535,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
   }
 
   public synchronized void drawUI(float scaleUp, float camZoom, double timeStep, int x1, int y1, int x2, int y2, PFont font) {
+    boardDrawingCycleSW.start();
+    
     fill(0, 0, 0);
     noStroke();
     rect(x1, y1, x2 - x1, y2 - y1);
@@ -618,7 +624,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       String[] buttonTexts = {"Brain Control", "Maintain pop. at " + creatureMinimum,
         "Screenshot now", "-   Image every " + nf((float)imageSaveInterval, 0, 2) + " years   +",
         "Text file now", "-    Text every " + nf((float)textSaveInterval, 0, 2) + " years    +",
-        "-    Play Speed (" + playSpeed + "x)    +", "This button does nothing"};
+        "-    Play Speed (" + playSpeed + "x)    +", "Show performance measurer"};
       if (userControl) {
         buttonTexts[0] = "Keyboard Control";
       }
@@ -704,6 +710,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
     if (selectedCreature != null) {
       drawCreature(selectedCreature, x1 + 65, y1 + 147, 2.3, scaleUp);
     }
+
+    boardDrawingCycleSW.lap();
+    
+    performanceMeasurer.cycle();
   }
 
   private synchronized void drawPopulationGraph(float x1, float x2, float y1, float y2) {
@@ -1054,5 +1064,9 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
 
   public void unselect() {
     selectedCreature = null;
+  }
+  
+  public void showPerformanceWindow() {
+    performanceMeasurer.show();
   }
 }

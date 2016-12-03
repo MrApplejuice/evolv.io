@@ -163,7 +163,9 @@ void draw() {
   }
 
   synchronized (simThread) {
+    evoBoard.boardSimulationCycleSW.start();
     simThread.sync();
+    evoBoard.boardSimulationCycleSW.lap();
     
     synchronized (evoBoard) {
       if (dragging == 1) {
@@ -310,7 +312,7 @@ void mousePressed() {
             break;
   
             case(7):
-            // Code for the eighth button
+              evoBoard.showPerformanceWindow();
             break;
           }
         }

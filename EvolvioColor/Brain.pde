@@ -135,10 +135,18 @@ public class Brain {
     }
     
     // Calculate the weights - apply mutation if applicable
+    final long MUTATION_RATE = (long) (0.01 * BRAIN_INTEGER_FACTOR);
+    
     for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
           newWeightWeightedSums[layer][i][ci] = newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
+          
+          // Do an incremental mutation like in the earlier implementation
+          if ((random.nextLong() % BRAIN_INTEGER_FACTOR) < MUTATION_RATE) {
+            long offset = random.nextLong() % BRAIN_INTEGER_FACTOR;
+            newWeightWeightedSums[layer][i][ci] += offset * offset / BRAIN_INTEGER_FACTOR;
+          }
         }
       }
     }
@@ -231,7 +239,7 @@ public class Brain {
   public double getOutput(int i) {
     i--;
     if ((i >= 0) && (i < BRAIN_INPUT_COUNT)) {
-      return (double) activations[BRAIN_WIDTH - 1][i + 1] / (double) BRAIN_INTEGER_FACTOR;
+      return (double) (activations[BRAIN_WIDTH - 1][i + 1] - BRAIN_INTEGER_FACTOR / 2) / (double) BRAIN_INTEGER_FACTOR;
     }
     return 0;
   }

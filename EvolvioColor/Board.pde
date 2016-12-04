@@ -8,7 +8,7 @@ public static final List<SoftBody> EMPTY_SOFT_BODY_LIST = new ArrayList<SoftBody
 public static final List<SoftBodyShadow> EMPTY_SOFT_BODY_SHADOW_LIST = new ArrayList<SoftBodyShadow>();
 
 /**
-  Handler interaface for synchrnozied handling of tile interactions.
+  Handler interface for synchrnozied handling of tile interactions.
  */
 public interface SynchronizedTileInteraction {
   public void handleTile(Tile tile);
@@ -382,8 +382,8 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
 
   // Rocks
   final int ROCKS_TO_ADD;
-  final float MIN_ROCK_ENERGY_BASE = 0.8;
-  final float MAX_ROCK_ENERGY_BASE = 1.6;
+  final float MIN_ROCK_ENERGY_BASE = 1.2;
+  final float MAX_ROCK_ENERGY_BASE = 3;
   final float ROCK_DENSITY = 5;
   final color ROCK_COLOR = color(0, 0, 0.5);
   ArrayList<SoftBody> rocks;
@@ -711,7 +711,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       int scaleup = 30;
       float apX = round((mouseX - 400 - x1) / (float) scaleup);
       float apY = round((mouseY - 80 - y1) / (float) scaleup);
-      selectedCreature.drawBrain(font, 30, (int)apX, (int)apY);
+      selectedCreature.drawBrain(font, scaleup, (int)apX, (int)apY);
       popMatrix();
     }
     drawPopulationGraph(x1, x2, y1, y2);

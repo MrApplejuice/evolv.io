@@ -59,6 +59,10 @@ class Creature extends SoftBody implements OrientedBody {
     return rotation;
   }
 
+  public Brain getBrain() {
+    return brain;
+  }
+
   public Creature(int id, Vector2D pos, Vector2D vel, double tenergy, 
     double tdensity, double thue, double tsaturation, double tbrightness, AbstractBoardInterface tb, double bt, 
     double rot, double tvr, String tname, String tparents, boolean mutateName, 
@@ -176,19 +180,18 @@ class Creature extends SoftBody implements OrientedBody {
     }
     inputs[9] = energy;
     inputs[10] = mouthHue;
-    brain.input(inputs);
+    brain.propagateInputs(inputs);
     
     if (useOutput) {
-      double[] output = brain.outputs();
-      hue = Math.abs(output[0]) % 1.0;
-      accelerate(output[1], timeStep);
-      turn(output[2], timeStep);
-      eat(output[3], timeStep);
-      fight(output[4]);
-      if (output[5] > 0 && board.getCurrentYear() - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
+      hue = Math.abs(brain.getOutput(0)) % 1.0;
+      accelerate(brain.getOutput(1), timeStep);
+      turn(brain.getOutput(2), timeStep);
+      eat(brain.getOutput(3), timeStep);
+      fight(brain.getOutput(4));
+      if (brain.getOutput(5) > 0 && board.getCurrentYear() - birthTime >= MATURE_AGE && energy > SAFE_SIZE) {
         reproduce(SAFE_SIZE);
       }
-      mouthHue = Math.abs(output[10]) % 1.0;
+      mouthHue = Math.abs(brain.getOutput(10)) % 1.0;
     }
   }
  //<>//
@@ -373,7 +376,7 @@ class Creature extends SoftBody implements OrientedBody {
       for (final SoftBody possibleParent : colliders) {
         if (Creature.class.isInstance(possibleParent)) {
           final Creature possibleParentCreature = Creature.class.cast(possibleParent);
-          if (possibleParentCreature.brain.outputs()[9] > -1) { // Must be a WILLING creature to also give birth.
+          if (possibleParentCreature.brain.getOutput(9) > -1) { // Must be a WILLING creature to also give birth.
             final double distance = position.distance(possibleParent.getPosition());
             double combinedRadius = getRadius() * FIGHT_RANGE + possibleParent.getRadius();
             if (distance < combinedRadius) {

@@ -1,15 +1,27 @@
+import java.util.Random;
+
 public static final int MEMORY_COUNT = 1;
 public static final int BRAIN_WIDTH = 3;
-public static final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
+public static final int BRAIN_INPUT_COUNT = 11;
+public static final int BRAIN_HEIGHT = BRAIN_INPUT_COUNT + MEMORY_COUNT + 1;
 
 public static final long BRAIN_INTEGER_FACTOR = 10000;
 public static final long BRAIN_INTEGER_CLIP_BOUND = 10000 * BRAIN_INTEGER_FACTOR;
 
 public static final long STARTING_WEIGHT_VARIABILITY = (long) (1.0 * BRAIN_INTEGER_FACTOR);
 
+public static final long LONG_SIGMOID_RANGE = 100 * BRAIN_INTEGER_FACTOR;
+public static final int LONG_SIGMOID_RESOLUTION = 1000;
+public static final long[] LONG_SIGMOID_LOOKUP = new long[LONG_SIGMOID_RESOLUTION + 1];
 
 public static String[] BRAIN_INPUT_LABELS = new String[BRAIN_HEIGHT]; 
 public static String[] BRAIN_OUTPUT_LABELS = new String[BRAIN_HEIGHT]; 
+
+static {
+  for (int i = 0; i <= LONG_SIGMOID_RESOLUTION; i++) {
+    LONG_SIGMOID_LOOKUP[i] = (long) (((double) BRAIN_INTEGER_FACTOR) / (1.0d + Math.exp(-((double) LONG_SIGMOID_RANGE / (double) BRAIN_INTEGER_FACTOR * ((double) i / (double) LONG_SIGMOID_RESOLUTION)))));
+  }
+}
 
 static {
   //initialize labels
@@ -27,11 +39,11 @@ static {
     BRAIN_OUTPUT_LABELS[i] = baseOutput[i];
   }
   for (int i = 0; i < MEMORY_COUNT; i++) {
-    inputLabels[i+11]="memory";
-    outputLabels[i+11] = "memory";
+    BRAIN_INPUT_LABELS[i+12]="memory";
+    BRAIN_OUTPUT_LABELS[i+12] = "memory";
   }
-  inputLabels[BRAIN_HEIGHT-1] = "const.";
-  outputLabels[BRAIN_HEIGHT-1] = "const.";
+  BRAIN_INPUT_LABELS[0] = "const.";
+  BRAIN_OUTPUT_LABELS[0] = "const.";
 }
 
 /**
@@ -44,21 +56,22 @@ public class Brain {
   private long[][][] weights;   // Indexing: [neuron-layer][neuron-index][neuron-input-index]
   private long[][] activations; // Indexing: [neuron-layer][neuron-index]
 
-  public Brain(final double[][][] tweights, final double[][] tactivations) {
+  public Brain(final long[][][] tweights, final long[][] tactivations) {
     //initialize brain
-    weights = new double[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
-    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+    weights = new long[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
           if (tweights != null) {
             weights[layer][i][ci] = tweights[layer][i][ci];
           } else {
-            weights[layer][i][ci] = random.randInt(-STARTING_WEIGHT_VARIABILITY, STARTING_WEIGHT_VARIABILITY);
+            weights[layer][i][ci] = random.nextLong() % (2 * STARTING_WEIGHT_VARIABILITY) - STARTING_WEIGHT_VARIABILITY;
           }
         }
       }
     }
-    activations = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
+    
+    activations = new long[BRAIN_WIDTH][BRAIN_HEIGHT];
     for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         if (tactivations != null) {
@@ -72,46 +85,65 @@ public class Brain {
 
   public Brain evolve(List<Creature> parents) {
     // Initialize new weights
-    int[][][] newWeightCounts = new int[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
-    long[][][] newWeights = new long[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    long[][][] newWeightAbsWeightSum = new long[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    long[][][] newWeightWeightedSums = new long[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT];
     
-    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+    for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
-          newWeightCounts[layer][i][ci] = 0;
+          newWeightAbsWeightSum[layer][i][ci] = 0;
+          newWeightWeightedSums[layer][i][ci] = 0;
         }
       }
     }
-    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+    
+    // Create weighted end-point cross over function. The goal here is to only 
+    // start from an output neuron and trace its inputs back to the inputs. And use
+    // the weights along this trail to modify the weights for each parent.  
+    long[] tracedWeights = new long[BRAIN_HEIGHT];
+    long[] newTracedWeights = new long[BRAIN_HEIGHT];
+    
+    for (int outNodeIndex = 0; outNodeIndex < BRAIN_HEIGHT; outNodeIndex++) {
+      final int selectedParent = random.nextInt(parents.size());
+      final Brain parentBrain = parents.get(selectedParent).getBrain();
+      
+      for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+        final long w = parentBrain.weights[BRAIN_WIDTH - 1][outNodeIndex][ci];
+        tracedWeights[ci] = w;
+        newWeightAbsWeightSum[BRAIN_WIDTH - 2][outNodeIndex][ci] = 1;
+        newWeightWeightedSums[BRAIN_WIDTH - 2][outNodeIndex][ci] = w;
+      }
+      
+      for (int layer = BRAIN_WIDTH - 3; layer >= 0; layer--) {
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          newTracedWeights[ci] = 0;
+        }
+        
+        for (int i = 0; i < BRAIN_HEIGHT; i++) {
+          for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+            final long w = parentBrain.weights[layer][i][ci];
+            newTracedWeights[ci] += tracedWeights[i] * w / BRAIN_INTEGER_FACTOR;
+            newWeightAbsWeightSum[layer][i][ci] += Math.abs(w);
+            newWeightWeightedSums[layer][i][ci] += Math.abs(w) * w;
+          }
+        }
+        
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          tracedWeights[ci] = newTracedWeights[ci] / BRAIN_HEIGHT;
+        }
+      }
+    }
+    
+    // Calculate the weights - apply mutation if applicable
+    for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
-          newWeights[layer][i][ci] = 0;
+          newWeightWeightedSums[layer][i][ci] = BRAIN_INTEGER_FACTOR * newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
         }
       }
     }
     
-    need to decide what to do here
-    
-    // Create weighted end-point cross over function
-    double randomParentRotation = Math.random();
-    for (int x = 0; x < BRAIN_WIDTH - 1; x++) {
-      for (int y = 0; y < BRAIN_HEIGHT; y++) {
-        for (int z = 0; z < BRAIN_HEIGHT - 1; z++) {
-          float axonAngle = atan2((y + z) / 2.0 - BRAIN_HEIGHT / 2.0, x - BRAIN_WIDTH / 2) / (2 * PI) + PI;
-          Brain parentForAxon = parents.get((int)(((axonAngle + randomParentRotation) % 1.0) * parentsTotal)).brain;
-          newBrain[x][y][z] = parentForAxon.axons[x][y][z].mutateAxon();
-        }
-      }
-    }
-    for (int x = 0; x < BRAIN_WIDTH; x++) {
-      for (int y = 0; y < BRAIN_HEIGHT; y++) {
-        float axonAngle = atan2(y - BRAIN_HEIGHT / 2.0, x - BRAIN_WIDTH / 2) / (2 * PI) + PI;
-        Brain parentForAxon = parents.get((int)(((axonAngle + randomParentRotation) % 1.0) * parentsTotal)).brain;
-        newNeurons[x][y] = parentForAxon.neurons[x][y];
-      }
-    }
-    
-    return new Brain(newBrain, null);
+    return new Brain(newWeightWeightedSums, null);
   }
 
   public void draw(PFont font, float scaleUp, int mX, int mY) {
@@ -125,16 +157,29 @@ public class Brain {
     textFont(font, 0.58 * scaleUp);
     fill(0, 0, 1);
     for (int y = 0; y < BRAIN_HEIGHT; y++) {
+      String text;
+
+      if (y < BRAIN_INPUT_LABELS.length) {
+        text = BRAIN_INPUT_LABELS[y];
+      } else {
+        text = "Unk. " + y;
+      }
       textAlign(RIGHT);
-      text(inputLabels[y], (-neuronSize - 0.1) * scaleUp, (y + (neuronSize * 0.6)) * scaleUp);
+      text(text, (-neuronSize - 0.1) * scaleUp, (y + (neuronSize * 0.6)) * scaleUp);
+
+      if (y < BRAIN_OUTPUT_LABELS.length) {
+        text = BRAIN_OUTPUT_LABELS[y];
+      } else {
+        text = "Unk. " + y;
+      }
       textAlign(LEFT);
-      text(outputLabels[y], (BRAIN_WIDTH - 1 + neuronSize + 0.1) * scaleUp, (y + (neuronSize * 0.6)) * scaleUp);
+      text(text, (BRAIN_WIDTH - 1 + neuronSize + 0.1) * scaleUp, (y + (neuronSize * 0.6)) * scaleUp);
     }
     textAlign(CENTER);
     for (int x = 0; x < BRAIN_WIDTH; x++) {
       for (int y = 0; y < BRAIN_HEIGHT; y++) {
         noStroke();
-        double val = neurons[x][y];
+        double val = (double) activations[x][y] / (double) BRAIN_INTEGER_FACTOR;
         fill(neuronFillColor(val));
         ellipse(x * scaleUp, y * scaleUp, neuronSize * scaleUp, neuronSize * scaleUp);
         fill(neuronTextColor(val));
@@ -153,48 +198,59 @@ public class Brain {
     }
   }
 
-  public void input(double[] inputs) {
-    int end = BRAIN_WIDTH - 1;
-    for (int i = 0; i<11; i++) {
-      neurons[0][i] = inputs[i];
+  public void propagateInputs(double[] inputs) {
+    for (int i = 0; i < BRAIN_INPUT_COUNT; i++) {
+      if (i < inputs.length) {
+        activations[0][i + 1] = (long) (inputs[i] * BRAIN_INTEGER_FACTOR);
+      } else {
+        activations[0][i + 1] = 0;
+      }
     }
-    for (int i = 0; i<MEMORY_COUNT; i++) {
-      neurons[0][11+i] = neurons[end][11+i];
+    for (int i = 1 + BRAIN_INPUT_COUNT; i < BRAIN_WIDTH; i++) {
+      activations[0][i] = activations[BRAIN_WIDTH - 1][i];
     }
-    neurons[0][BRAIN_HEIGHT-1] = 1;
-    for (int x = 1; x < BRAIN_WIDTH; x++) {
-      for (int y = 0; y < BRAIN_HEIGHT-1; y++) {
-        double total = 0;
-        for (int input = 0; input < BRAIN_HEIGHT; input++) {
-          total += neurons[x - 1][input] * axons[x - 1][input][y].weight;
+    
+    
+    for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        activations[layer + 1][i] = 0;
+      }
+      
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          activations[layer + 1][i] += weights[layer][i][ci] * activations[layer][ci] / BRAIN_INTEGER_FACTOR;
         }
-        if (x == BRAIN_WIDTH - 1) {
-          neurons[x][y] = total;
-        } else {
-          neurons[x][y] = sigmoid(total);
-        }
+      }
+      
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
       }
     }
   }
 
-  public double[] outputs() {
-    int end = BRAIN_WIDTH - 1;
-    double[] output = new double[11];
-    for (int i = 0; i<11; i++) {
-      output[i] = neurons[end][i];
+  public double getOutput(int i) {
+    i--;
+    if ((i >= 0) && (i < BRAIN_INPUT_COUNT)) {
+      return (double) activations[BRAIN_WIDTH - 1][i + 1] / (double) BRAIN_INTEGER_FACTOR;
     }
-    return output;
+    return 0;
   }
 
 
   private void drawAxon(int x1, int y1, int x2, int y2, float scaleUp) {
-    stroke(neuronFillColor(axons[x1][y1][y2].weight*neurons[x1][y1]));
+    stroke(neuronFillColor((double) weights[x1][y2][y1] / (double) BRAIN_INTEGER_FACTOR));
 
     line(x1 * scaleUp, y1 * scaleUp, x2 * scaleUp, y2 * scaleUp);
   }
 
-  private double sigmoid(double input) {
-    return 1.0 / (1.0 + Math.pow(2.71828182846, -input));
+  private long sigmoid(long input) {
+    if (input < 0) {
+      return BRAIN_INTEGER_FACTOR / 2 - sigmoid(-input); 
+    } else if (input > LONG_SIGMOID_RANGE) {
+      return LONG_SIGMOID_LOOKUP[LONG_SIGMOID_RESOLUTION + 1];
+    } else {
+      return LONG_SIGMOID_LOOKUP[(int) (input * LONG_SIGMOID_RESOLUTION / LONG_SIGMOID_RANGE)];
+    }
   }
 
   private color neuronFillColor(double d) {

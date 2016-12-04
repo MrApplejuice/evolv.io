@@ -1,17 +1,17 @@
 import java.util.Random;
 
-public static final int MEMORY_COUNT = 1;
-public static final int BRAIN_WIDTH = 3;
+public static final int MEMORY_COUNT = 10;
+public static final int BRAIN_WIDTH = 5;
 public static final int BRAIN_INPUT_COUNT = 11;
 public static final int BRAIN_HEIGHT = BRAIN_INPUT_COUNT + MEMORY_COUNT + 1;
 
-public static final long BRAIN_INTEGER_FACTOR = 10000;
+public static final long BRAIN_INTEGER_FACTOR = 100000;
 public static final long BRAIN_INTEGER_CLIP_BOUND = 10000 * BRAIN_INTEGER_FACTOR;
 
 public static final long STARTING_WEIGHT_VARIABILITY = (long) (1.0 * BRAIN_INTEGER_FACTOR);
 
 public static final long LONG_SIGMOID_RANGE = 100 * BRAIN_INTEGER_FACTOR;
-public static final int LONG_SIGMOID_RESOLUTION = 1000;
+public static final int LONG_SIGMOID_RESOLUTION = 100000;
 public static final long[] LONG_SIGMOID_LOOKUP = new long[LONG_SIGMOID_RESOLUTION + 1];
 
 public static String[] BRAIN_INPUT_LABELS = new String[BRAIN_HEIGHT]; 
@@ -140,7 +140,11 @@ public class Brain {
     for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
-          newWeightWeightedSums[layer][i][ci] = newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
+          if (newWeightAbsWeightSum[layer][i][ci] == 0) {
+            newWeightWeightedSums[layer][i][ci] = 0;
+          } else {
+            newWeightWeightedSums[layer][i][ci] = newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
+          }
           
           // Do an incremental mutation like in the earlier implementation
           if ((random.nextLong() % BRAIN_INTEGER_FACTOR) < MUTATION_RATE) {

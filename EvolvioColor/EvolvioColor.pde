@@ -11,7 +11,7 @@ final float MIN_TEMPERATURE = -0.5;
 final float MAX_TEMPERATURE = 1.0;
 
 final int ROCKS_TO_ADD = 0;
-final int CREATURE_MINIMUM = 60;
+final int CREATURE_MINIMUM = 300;
 
 float scaleFactor;
 int windowWidth;

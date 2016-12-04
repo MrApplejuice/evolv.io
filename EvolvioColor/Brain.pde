@@ -34,13 +34,13 @@ static {
     "Birth", "How funny?", "How popular?", "How generous?", "How smart?", 
     "MHue"};
   
-  for (int i = 1; i < 12; i++) {
-    BRAIN_INPUT_LABELS[i] = baseInput[i];
-    BRAIN_OUTPUT_LABELS[i] = baseOutput[i];
+  for (int i = 0; i < BRAIN_INPUT_COUNT; i++) { //<>//
+    BRAIN_INPUT_LABELS[i + 1] = baseInput[i];
+    BRAIN_OUTPUT_LABELS[i + 1] = baseOutput[i];
   }
-  for (int i = 0; i < MEMORY_COUNT; i++) {
-    BRAIN_INPUT_LABELS[i+12]="memory";
-    BRAIN_OUTPUT_LABELS[i+12] = "memory";
+  for (int i = 0; i < MEMORY_COUNT; i++) { //<>//
+    BRAIN_INPUT_LABELS[i + 12]= "memory" + (i + 1);
+    BRAIN_OUTPUT_LABELS[i + 12] = "memory" + (i + 1);
   }
   BRAIN_INPUT_LABELS[0] = "const.";
   BRAIN_OUTPUT_LABELS[0] = "const.";

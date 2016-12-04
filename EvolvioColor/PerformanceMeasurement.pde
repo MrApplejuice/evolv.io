@@ -232,7 +232,7 @@ public static class PerformanceMeasurer {
       }
       
       xAxis.setRange(leftOffset, maxCycle);
-      yAxis.setRange(0, Math.pow(2, Math.ceil(Math.log(maxValue) / Math.log(2.0d))));
+      yAxis.setRange(0, Math.pow(2, Math.max(-10, Math.ceil(Math.log(maxValue) / Math.log(2.0d)))));
       chart.getChart().fireChartChanged();
       chart.invalidate();
     }

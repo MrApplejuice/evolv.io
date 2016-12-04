@@ -223,9 +223,7 @@ public class Brain {
       }
       
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
-        System.out.println("Activations: " + activations[layer + 1][i]);
         activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
-        System.out.println("Sigmoid: " + activations[layer + 1][i]);
       }
     }
   }

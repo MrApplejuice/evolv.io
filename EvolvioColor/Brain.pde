@@ -34,11 +34,11 @@ static {
     "Birth", "How funny?", "How popular?", "How generous?", "How smart?", 
     "MHue"};
   
-  for (int i = 0; i < BRAIN_INPUT_COUNT; i++) { //<>//
+  for (int i = 0; i < BRAIN_INPUT_COUNT; i++) {
     BRAIN_INPUT_LABELS[i + 1] = baseInput[i];
     BRAIN_OUTPUT_LABELS[i + 1] = baseOutput[i];
   }
-  for (int i = 0; i < MEMORY_COUNT; i++) { //<>//
+  for (int i = 0; i < MEMORY_COUNT; i++) {
     BRAIN_INPUT_LABELS[i + 12]= "memory" + (i + 1);
     BRAIN_OUTPUT_LABELS[i + 12] = "memory" + (i + 1);
   }
@@ -65,7 +65,7 @@ public class Brain {
           if (tweights != null) {
             weights[layer][i][ci] = tweights[layer][i][ci];
           } else {
-            weights[layer][i][ci] = random.nextLong() % (2 * STARTING_WEIGHT_VARIABILITY) - STARTING_WEIGHT_VARIABILITY;
+            weights[layer][i][ci] = random.nextLong() % (2 * STARTING_WEIGHT_VARIABILITY + 1) - STARTING_WEIGHT_VARIABILITY;
           }
         }
       }
@@ -88,7 +88,7 @@ public class Brain {
     long[][][] newWeightAbsWeightSum = new long[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT];
     long[][][] newWeightWeightedSums = new long[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT];
     
-    for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
+    for (int layer = 0; layer < BRAIN_WIDTH - 2; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
           newWeightAbsWeightSum[layer][i][ci] = 0;
@@ -108,7 +108,7 @@ public class Brain {
       final Brain parentBrain = parents.get(selectedParent).getBrain();
       
       for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
-        final long w = parentBrain.weights[BRAIN_WIDTH - 1][outNodeIndex][ci];
+        final long w = parentBrain.weights[BRAIN_WIDTH - 2][outNodeIndex][ci];
         tracedWeights[ci] = w;
         newWeightAbsWeightSum[BRAIN_WIDTH - 2][outNodeIndex][ci] = 1;
         newWeightWeightedSums[BRAIN_WIDTH - 2][outNodeIndex][ci] = w;
@@ -138,7 +138,7 @@ public class Brain {
     for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
-          newWeightWeightedSums[layer][i][ci] = BRAIN_INTEGER_FACTOR * newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
+          newWeightWeightedSums[layer][i][ci] = newWeightWeightedSums[layer][i][ci] / newWeightAbsWeightSum[layer][i][ci];
         }
       }
     }
@@ -223,7 +223,9 @@ public class Brain {
       }
       
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        System.out.println("Activations: " + activations[layer + 1][i]);
         activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
+        System.out.println("Sigmoid: " + activations[layer + 1][i]);
       }
     }
   }
@@ -245,11 +247,11 @@ public class Brain {
 
   private long sigmoid(long input) {
     if (input < 0) {
-      return BRAIN_INTEGER_FACTOR / 2 - sigmoid(-input); 
-    } else if (input > LONG_SIGMOID_RANGE) {
-      return LONG_SIGMOID_LOOKUP[LONG_SIGMOID_RESOLUTION + 1];
+      return BRAIN_INTEGER_FACTOR - sigmoid(-input); 
+    } else if (input >= LONG_SIGMOID_RANGE) {
+      return LONG_SIGMOID_LOOKUP[LONG_SIGMOID_RESOLUTION];
     } else {
-      return LONG_SIGMOID_LOOKUP[(int) (input * LONG_SIGMOID_RESOLUTION / LONG_SIGMOID_RANGE)];
+      return LONG_SIGMOID_LOOKUP[(int) (input * (LONG_SIGMOID_RESOLUTION + 1) / LONG_SIGMOID_RANGE)];
     }
   }
 

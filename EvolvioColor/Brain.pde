@@ -1,96 +1,98 @@
 public static final int MEMORY_COUNT = 1;
 public static final int BRAIN_WIDTH = 3;
 public static final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
-public static final double AXON_START_MUTABILITY = 0.0005;
-public static final double STARTING_AXON_VARIABILITY = 1.0;
 
-public static final double AXON_MUTABILITY_MUTABILITY = 0.7;
-public static final int AXON_MUTATE_POWER = 9;
-public static final double AXON_MUTATE_MULTI = Math.pow(.5, AXON_MUTATE_POWER);
+public static final long BRAIN_INTEGER_FACTOR = 10000;
+public static final long BRAIN_INTEGER_CLIP_BOUND = 10000 * BRAIN_INTEGER_FACTOR;
 
+public static final long STARTING_WEIGHT_VARIABILITY = (long) (1.0 * BRAIN_INTEGER_FACTOR);
+
+
+public static String[] BRAIN_INPUT_LABELS = new String[BRAIN_HEIGHT]; 
+public static String[] BRAIN_OUTPUT_LABELS = new String[BRAIN_HEIGHT]; 
+
+static {
+  //initialize labels
+  String[] baseInput = {
+    "0Hue", "0Sat", "0Bri", "1Hue", "1Sat", 
+    "1Bri", "2Hue", "2Sat", "2Bri", "Size", 
+    "MHue"};
+  String[] baseOutput = {
+    "BHue", "Accel.", "Turn", "Eat", "Fight", 
+    "Birth", "How funny?", "How popular?", "How generous?", "How smart?", 
+    "MHue"};
+  
+  for (int i = 1; i < 12; i++) {
+    BRAIN_INPUT_LABELS[i] = baseInput[i];
+    BRAIN_OUTPUT_LABELS[i] = baseOutput[i];
+  }
+  for (int i = 0; i < MEMORY_COUNT; i++) {
+    inputLabels[i+11]="memory";
+    outputLabels[i+11] = "memory";
+  }
+  inputLabels[BRAIN_HEIGHT-1] = "const.";
+  outputLabels[BRAIN_HEIGHT-1] = "const.";
+}
+
+/**
+  For optimization purposes, the "new brain" uses integer algebra to do the neural
+  network computations.
+ */
 public class Brain {
-  public class Axon {
-    public double weight;
-    public double mutability;
-    
-    public Axon(double w, double m) {
-      weight = w;
-      mutability = m;
-    }
-  
-    public Axon mutateAxon() {
-      double mutabilityMutate = Math.pow(0.5, pmRan() * AXON_MUTABILITY_MUTABILITY);
-      return new Axon(weight + r() * mutability / AXON_MUTATE_MULTI, mutability * mutabilityMutate);
-    }
-    
-    public double r() {
-      // This function is weird and produces flippy negative sighns in half of the cases, and stable positive results in the other half
-      // the absolute value remains the same though.
-      return Math.pow(pmRan(), AXON_MUTATE_POWER);
-    }
-    
-    public double pmRan() {
-      return Math.random() * 2 - 1;
-    }
-  }
-  
-  private Axon[][][] axons;
-  private double[][] neurons;
+  private Random random = new Random();
 
-  //labels
-  private String[] inputLabels = new String[BRAIN_HEIGHT];
-  private String[] outputLabels = new String[BRAIN_HEIGHT];
+  private long[][][] weights;   // Indexing: [neuron-layer][neuron-index][neuron-input-index]
+  private long[][] activations; // Indexing: [neuron-layer][neuron-index]
 
-  public Brain(Axon[][][] tbrain, double[][] tneurons) {
+  public Brain(final double[][][] tweights, final double[][] tactivations) {
     //initialize brain
-    if (tbrain == null) {
-      axons = new Axon[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT - 1];
-      neurons = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
-      for (int x = 0; x < BRAIN_WIDTH - 1; x++) {
-        for (int y = 0; y < BRAIN_HEIGHT; y++) {
-          for (int z = 0; z < BRAIN_HEIGHT - 1; z++) {
-            double startingWeight = (Math.random() * 2 - 1) * STARTING_AXON_VARIABILITY;
-            axons[x][y][z] = new Axon(startingWeight, AXON_START_MUTABILITY);
-          }
-        }
-      }
-      neurons = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
-      for (int x = 0; x < BRAIN_WIDTH; x++) {
-        for (int y = 0; y < BRAIN_HEIGHT; y++) {
-          if (y == BRAIN_HEIGHT-1) {
-            neurons[x][y] = 1;
+    weights = new double[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          if (tweights != null) {
+            weights[layer][i][ci] = tweights[layer][i][ci];
           } else {
-            neurons[x][y] = 0;
+            weights[layer][i][ci] = random.randInt(-STARTING_WEIGHT_VARIABILITY, STARTING_WEIGHT_VARIABILITY);
           }
         }
       }
-    } else {
-      axons = tbrain;
-      neurons = tneurons;
     }
-    
-    //initialize labels
-    String[] baseInput = {"0Hue", "0Sat", "0Bri", "1Hue", 
-      "1Sat", "1Bri", "2Hue", "2Sat", "2Bri", "Size", "MHue"};
-    String[] baseOutput = {"BHue", "Accel.", "Turn", "Eat", "Fight", "Birth", "How funny?", 
-      "How popular?", "How generous?", "How smart?", "MHue"};
-    for (int i = 0; i<11; i++) {
-      inputLabels[i]=baseInput[i];
-      outputLabels[i] = baseOutput[i];
+    activations = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
+    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        if (tactivations != null) {
+          activations[layer][i] = tactivations[layer][i];
+        } else {
+          activations[layer][i] = i == 0 ? 1 * BRAIN_INTEGER_FACTOR : 0;
+        }
+      }
     }
-    for (int i = 0; i<MEMORY_COUNT; i++) {
-      inputLabels[i+11]="memory";
-      outputLabels[i+11] = "memory";
-    }
-    inputLabels[BRAIN_HEIGHT-1] = "const.";
-    outputLabels[BRAIN_HEIGHT-1] = "const.";
   }
 
-  // Should be static, cannot easily make this static
   public Brain evolve(List<Creature> parents) {
-    int parentsTotal = parents.size();
-    Axon[][][] newBrain = new Axon[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT - 1];
-    double[][] newNeurons = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
+    // Initialize new weights
+    int[][][] newWeightCounts = new int[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    long[][][] newWeights = new long[BRAIN_WIDTH][BRAIN_HEIGHT][BRAIN_HEIGHT];
+    
+    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          newWeightCounts[layer][i][ci] = 0;
+        }
+      }
+    }
+    for (int layer = 0; layer < BRAIN_WIDTH; layer++) {
+      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+        for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
+          newWeights[layer][i][ci] = 0;
+        }
+      }
+    }
+    
+    need to decide what to do here
+    
+    // Create weighted end-point cross over function
     double randomParentRotation = Math.random();
     for (int x = 0; x < BRAIN_WIDTH - 1; x++) {
       for (int y = 0; y < BRAIN_HEIGHT; y++) {
@@ -108,7 +110,8 @@ public class Brain {
         newNeurons[x][y] = parentForAxon.neurons[x][y];
       }
     }
-    return new Brain(newBrain, newNeurons);
+    
+    return new Brain(newBrain, null);
   }
 
   public void draw(PFont font, float scaleUp, int mX, int mY) {

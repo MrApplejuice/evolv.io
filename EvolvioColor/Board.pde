@@ -707,8 +707,10 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       }
       pushMatrix();
       translate(400, 80);
-      float apX = round((mouseX - 400 - x1) / 46.0);
-      float apY = round((mouseY - 80 - y1) / 46.0);
+      
+      int scaleup = 30;
+      float apX = round((mouseX - 400 - x1) / (float) scaleup);
+      float apY = round((mouseY - 80 - y1) / (float) scaleup);
       selectedCreature.drawBrain(font, 30, (int)apX, (int)apY);
       popMatrix();
     }

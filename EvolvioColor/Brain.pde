@@ -212,17 +212,17 @@ public class Brain {
     
     
     for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
-      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+      for (int i = 1; i < BRAIN_HEIGHT; i++) {
         activations[layer + 1][i] = 0;
       }
       
-      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+      for (int i = 1; i < BRAIN_HEIGHT; i++) {
         for (int ci = 0; ci < BRAIN_HEIGHT; ci++) {
           activations[layer + 1][i] += weights[layer][i][ci] * activations[layer][ci] / BRAIN_INTEGER_FACTOR;
         }
       }
       
-      for (int i = 0; i < BRAIN_HEIGHT; i++) {
+      for (int i = 1; i < BRAIN_HEIGHT; i++) {
         activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
       }
     }

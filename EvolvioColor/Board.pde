@@ -709,7 +709,7 @@ class Board implements AbstractBoardInterface, DrawConfiguration {
       translate(400, 80);
       float apX = round((mouseX - 400 - x1) / 46.0);
       float apY = round((mouseY - 80 - y1) / 46.0);
-      selectedCreature.drawBrain(font, 46, (int)apX, (int)apY);
+      selectedCreature.drawBrain(font, 30, (int)apX, (int)apY);
       popMatrix();
     }
     drawPopulationGraph(x1, x2, y1, y2);

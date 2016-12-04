@@ -1,10 +1,38 @@
-class Brain {
-  // Brain
-  final int MEMORY_COUNT = 1;
-  final int BRAIN_WIDTH = 3;
-  final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
-  final double AXON_START_MUTABILITY = 0.0005;
-  final double STARTING_AXON_VARIABILITY = 1.0;
+public static final int MEMORY_COUNT = 1;
+public static final int BRAIN_WIDTH = 3;
+public static final int BRAIN_HEIGHT = 11+MEMORY_COUNT+1;
+public static final double AXON_START_MUTABILITY = 0.0005;
+public static final double STARTING_AXON_VARIABILITY = 1.0;
+
+public static final double AXON_MUTABILITY_MUTABILITY = 0.7;
+public static final int AXON_MUTATE_POWER = 9;
+public static final double AXON_MUTATE_MULTI = Math.pow(.5, AXON_MUTATE_POWER);
+
+public class Brain {
+  public class Axon {
+    public double weight;
+    public double mutability;
+    
+    public Axon(double w, double m) {
+      weight = w;
+      mutability = m;
+    }
+  
+    public Axon mutateAxon() {
+      double mutabilityMutate = Math.pow(0.5, pmRan() * AXON_MUTABILITY_MUTABILITY);
+      return new Axon(weight + r() * mutability / AXON_MUTATE_MULTI, mutability * mutabilityMutate);
+    }
+    
+    public double r() {
+      // This function is weird and produces flippy negative sighns in half of the cases, and stable positive results in the other half
+      // the absolute value remains the same though.
+      return Math.pow(pmRan(), AXON_MUTATE_POWER);
+    }
+    
+    public double pmRan() {
+      return Math.random() * 2 - 1;
+    }
+  }
   
   private Axon[][][] axons;
   private double[][] neurons;
@@ -58,12 +86,12 @@ class Brain {
     outputLabels[BRAIN_HEIGHT-1] = "const.";
   }
 
-  //this would be a static method, but processing doesn't like mixing types
+  // Should be static, cannot easily make this static
   public Brain evolve(List<Creature> parents) {
     int parentsTotal = parents.size();
     Axon[][][] newBrain = new Axon[BRAIN_WIDTH - 1][BRAIN_HEIGHT][BRAIN_HEIGHT - 1];
     double[][] newNeurons = new double[BRAIN_WIDTH][BRAIN_HEIGHT];
-    float randomParentRotation = random(0, 1);
+    double randomParentRotation = Math.random();
     for (int x = 0; x < BRAIN_WIDTH - 1; x++) {
       for (int y = 0; y < BRAIN_HEIGHT; y++) {
         for (int z = 0; z < BRAIN_HEIGHT - 1; z++) {

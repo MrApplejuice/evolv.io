@@ -1,14 +1,14 @@
 import java.util.Random;
 
-public static final int MEMORY_COUNT = 10;
-public static final int BRAIN_WIDTH = 5;
+public static final int MEMORY_COUNT = 12;
+public static final int BRAIN_WIDTH = 4;
 public static final int BRAIN_INPUT_COUNT = 11;
 public static final int BRAIN_HEIGHT = BRAIN_INPUT_COUNT + MEMORY_COUNT + 1;
 
 public static final long BRAIN_INTEGER_FACTOR = 100000;
 public static final long BRAIN_INTEGER_CLIP_BOUND = 10000 * BRAIN_INTEGER_FACTOR;
 
-public static final long STARTING_WEIGHT_VARIABILITY = (long) (1.0 * BRAIN_INTEGER_FACTOR);
+public static final long STARTING_WEIGHT_VARIABILITY = (long) (10.0 * BRAIN_INTEGER_FACTOR);
 
 public static final long LONG_SIGMOID_RANGE = 100 * BRAIN_INTEGER_FACTOR;
 public static final int LONG_SIGMOID_RESOLUTION = 100000;
@@ -135,7 +135,7 @@ public class Brain {
     }
     
     // Calculate the weights - apply mutation if applicable
-    final long MUTATION_RATE = (long) (0.01 * BRAIN_INTEGER_FACTOR);
+    final long MUTATION_RATE = (long) (0.1 * BRAIN_INTEGER_FACTOR);
     
     for (int layer = 0; layer < BRAIN_WIDTH - 1; layer++) {
       for (int i = 0; i < BRAIN_HEIGHT; i++) {
@@ -234,8 +234,11 @@ public class Brain {
         }
       }
       
-      for (int i = 1; i < BRAIN_HEIGHT; i++) {
-        activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
+      // Do not apply a sigmoid to the final layer!
+      if (layer < BRAIN_WIDTH - 2) {
+        for (int i = 1; i < BRAIN_HEIGHT; i++) {
+          activations[layer + 1][i] = sigmoid(activations[layer + 1][i]);
+        }
       }
     }
   }
@@ -243,7 +246,7 @@ public class Brain {
   public double getOutput(int i) {
     i--;
     if ((i >= 0) && (i < BRAIN_INPUT_COUNT)) {
-      return (double) (activations[BRAIN_WIDTH - 1][i + 1] - BRAIN_INTEGER_FACTOR / 2) / (double) BRAIN_INTEGER_FACTOR;
+      return (double) (activations[BRAIN_WIDTH - 1][i + 1]) / (double) BRAIN_INTEGER_FACTOR;
     }
     return 0;
   }
